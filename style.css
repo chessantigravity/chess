@@ -53,7 +53,8 @@ body {
     font-family: 'Outfit', sans-serif;
     background: var(--bg);
     color: var(--text);
-    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;   /* NO page scroll — everything fits in viewport */
     display: flex;
     flex-direction: column;
     transition: background 0.3s, color 0.3s;
@@ -61,14 +62,14 @@ body {
 
 /* ---------- HEADER ---------- */
 #app-header {
+    height: 52px;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.75rem 2rem;
+    padding: 0 1.5rem;
     background: var(--bg2);
     border-bottom: 1px solid var(--card-border);
-    position: sticky;
-    top: 0;
     z-index: 100;
 }
 .logo { display: flex; align-items: center; gap: 0.6rem; }
@@ -99,14 +100,25 @@ body {
 .dot.err { background: #ef4444; }
 
 /* ---------- MAIN ---------- */
-#app-main { flex: 1; padding: 1.5rem 2rem; max-width: 1280px; margin: 0 auto; width: 100%; }
+#app-main {
+    flex: 1;
+    min-height: 0;                    /* allow shrinking in flex */
+    padding: 0.6rem 1.25rem;          /* tight padding so board gets max space */
+    max-width: 1280px;
+    margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;                 /* nothing escapes */
+}
 
 /* ---------- SCREENS ---------- */
-.screen { display: none; }
+.screen { display: none; height: 100%; }
 .screen.active { display: block; }
 
 /* ---------- LOBBY ---------- */
-.lobby-hero { text-align: center; margin-bottom: 2rem; }
+/* Lobby can scroll since it's not the game screen */
+#lobby.active { display: block; overflow-y: auto; max-height: calc(100vh - 52px); padding-bottom: 1rem; }
+.lobby-hero { text-align: center; margin-bottom: 1.5rem; padding-top: 0.5rem; }
 .lobby-hero h1 { font-size: clamp(1.8rem, 4vw, 3rem); font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 .lobby-hero p { color: var(--text2); margin-top: 0.5rem; }
 
@@ -203,40 +215,66 @@ body {
     color: var(--accent);
 }
 
-/* ---------- GAME SCREEN ---------- */
-#game { display: none; grid-template-columns: 1fr 340px; gap: 1.5rem; align-items: start; }
-#game.active { display: grid; }
+/* ---------- GAME SCREEN — fills remaining viewport exactly ---------- */
+#game { display: none; }
+#game.active {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 1rem;
+    /* Height = viewport minus header minus main padding (top+bottom) */
+    height: calc(100vh - 52px - 1.2rem);
+    align-items: start;
+    overflow: hidden;
+}
 
-/* Board column */
-#board-col { display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; }
+/* Board column — vertical flex that uses ALL available height */
+#board-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    height: 100%;
+    min-height: 0;
+    justify-content: center;
+}
 
-/* Player strips */
+/* Player strips — compact & fixed height */
 .player-strip {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.6rem 0.85rem;
+    gap: 0.65rem;
+    padding: 0.45rem 0.75rem;
     background: var(--card);
     border: 1px solid var(--card-border);
-    border-radius: 12px;
+    border-radius: 10px;
+    flex-shrink: 0;          /* never shrink — constant height */
     transition: border-color 0.3s;
 }
 .player-strip.active { border-color: var(--clock-active); }
-.avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.p-name { font-weight: 700; font-size: 0.95rem; }
-.captures { font-size: 0.85rem; color: var(--text2); min-height: 1.2em; }
-.clock { margin-left: auto; font-size: 1.2rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.85rem; }
+.p-name { font-weight: 700; font-size: 0.9rem; }
+.captures { font-size: 0.78rem; color: var(--text2); min-height: 1.1em; }
+.clock { margin-left: auto; font-size: 1.1rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .player-strip.active .clock { color: var(--clock-active); }
 
-/* BOARD WRAPPER — the key sizing element */
+/* THE BOARD WRAPPER
+   Critical sizing rule:
+   - width: 100% of the board-col (1fr column)
+   - max-height: viewport minus header, padding, 2×player-strips, controls, gaps
+   - aspect-ratio: 1  →  browser picks the smaller dimension automatically
+   Result: a square that ALWAYS fits on screen with no scroll. */
 #board-wrap {
     width: 100%;
+    max-height: calc(100vh - 52px - 1.2rem - 50px - 50px - 38px - 2rem);
+    /* breakdown: header(52) + padding(1.2rem≈19) + strip×2(50+50) + controls(38) + gaps(2rem≈32) */
     aspect-ratio: 1 / 1;
+    margin: 0 auto;
+    flex-shrink: 1;
+    min-height: 0;
     position: relative;
-    border: 6px solid var(--board-border);
+    border: 5px solid var(--board-border);
     border-radius: 4px;
     overflow: hidden;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+    box-shadow: 0 10px 35px rgba(0,0,0,0.6);
 }
 
 /* THE CHESS BOARD — pure CSS grid */
@@ -320,20 +358,37 @@ body {
 .sq-label.rank { top: 2px; left: 3px; }
 .sq-label.file { bottom: 2px; right: 3px; }
 
-/* Board controls row */
-.board-controls { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+/* Board controls row — compact */
+.board-controls {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+}
+.board-controls .btn-sm {
+    flex: 1;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.78rem;
+}
 
 /* ---------- SIDEBAR ---------- */
-#sidebar { height: calc(100vh - 160px); min-height: 500px; }
-.sidebar-head { padding: 1rem 1.25rem; border-bottom: 1px solid var(--card-border); }
-.match-title { font-weight: 800; font-size: 1rem; }
-.match-sub { color: var(--text2); font-size: 0.8rem; }
+#sidebar {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+}
+.sidebar-head { padding: 0.75rem 1rem; border-bottom: 1px solid var(--card-border); flex-shrink: 0; }
+.match-title { font-weight: 800; font-size: 0.95rem; }
+.match-sub { color: var(--text2); font-size: 0.75rem; }
 
-.tab-bar { display: flex; border-bottom: 1px solid var(--card-border); }
-.tab { flex: 1; padding: 0.7rem; border: none; background: transparent; color: var(--text2); cursor: pointer; font-family: inherit; font-weight: 600; font-size: 0.9rem; border-bottom: 2px solid transparent; transition: all 0.2s; }
+.tab-bar { display: flex; border-bottom: 1px solid var(--card-border); flex-shrink: 0; }
+.tab { flex: 1; padding: 0.6rem; border: none; background: transparent; color: var(--text2); cursor: pointer; font-family: inherit; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid transparent; transition: all 0.2s; }
 .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-.tab-content { display: none; flex-direction: column; height: calc(100% - 108px); overflow: hidden; }
+.tab-content { display: none; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 .tab-content.active { display: flex; }
 
 #move-log {
@@ -413,12 +468,21 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 10px; }
 
 /* ---------- RESPONSIVE ---------- */
-@media (max-width: 860px) {
-    #game.active { grid-template-columns: 1fr; }
-    #sidebar { height: 400px; }
-    #app-main { padding: 1rem; }
+@media (max-width: 900px) {
+    #game.active {
+        grid-template-columns: 1fr;
+        height: auto;
+        overflow-y: auto;
+    }
+    body { overflow-y: auto; height: auto; }
+    #sidebar { height: 380px; }
+    #board-wrap {
+        max-height: 95vw;  /* on mobile: almost full width */
+    }
+    #app-main { padding: 0.5rem 0.75rem; }
 }
 @media (max-width: 520px) {
     .logo-text { display: none; }
-    #app-header { padding: 0.6rem 1rem; }
+    #app-header { padding: 0.5rem 0.75rem; }
+    .board-controls .btn-sm span { display: none; } /* hide text, keep icons */
 }
