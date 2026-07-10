@@ -6,11 +6,25 @@
 
 const ChessGame = (() => {
 
-    /* ---------- Unicode piece map ---------- */
+    /* ---------- Piece image CDN (Lichess cburnett set via jsDelivr) ---------- */
+    // Primary: Lichess open-source cburnett SVG pieces — same set used on lichess.org
+    const PIECE_CDN = 'https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/cburnett/';
+
+    // Unicode fallback (if CDN fails)
     const SYM = {
         wK:'♔', wQ:'♕', wR:'♖', wB:'♗', wN:'♘', wP:'♙',
         bK:'♚', bQ:'♛', bR:'♜', bB:'♝', bN:'♞', bP:'♟'
     };
+
+    function pieceHtml(piece) {
+        const key = piece.color + piece.type.toUpperCase(); // e.g. wK, bN
+        const uni = SYM[key];
+        const src = PIECE_CDN + key + '.svg';
+        // Render as img; if src fails, swap to unicode text fallback
+        return `<img class="piece-img" src="${src}" alt="${uni}"
+                     draggable="false"
+                     onerror="this.outerHTML='<span class=\'piece-uni\'>${uni}</span>'">`;
+    }
 
     /* ---------- State ---------- */
     let chessEngine = null;  // chess.js instance
@@ -107,11 +121,9 @@ const ChessGame = (() => {
                         : '<div class="hint-dot"></div>';
                 }
 
-                // Piece
+                // Piece image
                 if (piece) {
-                    const sym   = SYM[piece.color + piece.type.toUpperCase()];
-                    const pcls  = 'piece ' + (piece.color === 'w' ? 'white' : 'black');
-                    html += `<span class="${pcls}">${sym}</span>`;
+                    html += pieceHtml(piece);
                 }
 
                 html += '</div>';
@@ -220,14 +232,20 @@ const ChessGame = (() => {
         checkEnd();
     }
 
+
     /* ---------- Promotion dialog ---------- */
     function showPromoDialog(color) {
         const choices = ['q','r','b','n'];
         const names   = { q:'Queen', r:'Rook', b:'Bishop', n:'Knight' };
         let html = '';
         for (const t of choices) {
-            const sym = SYM[color + t.toUpperCase()];
-            html += `<div class="promo-piece" title="${names[t]}" data-promo="${t}">${sym}</div>`;
+            const key = color + t.toUpperCase();
+            const src = PIECE_CDN + key + '.svg';
+            const uni = SYM[key];
+            html += `<div class="promo-piece" title="${names[t]}" data-promo="${t}">
+                        <img src="${src}" alt="${uni}" style="width:70%;height:70%;object-fit:contain;"
+                             onerror="this.outerHTML='<span style=font-size:2rem>${uni}</span>'">
+                     </div>`;
         }
         document.getElementById('promo-choices').innerHTML = html;
         document.getElementById('promo-overlay').style.display = 'flex';
@@ -241,6 +259,7 @@ const ChessGame = (() => {
             attemptMove(from, to, el.getAttribute('data-promo'));
         };
     }
+
 
     /* ---------- Move log ---------- */
     function appendMoveToLog(result) {

@@ -10,41 +10,41 @@ html { font-size: 16px; }
 /* ---------- THEME VARIABLES ---------- */
 :root,
 [data-theme="mono"] {
-    --bg:          #0a0f1e;
-    --bg2:         #111827;
-    --card:        #1e2a3e;
-    --card-border: #2d3f5c;
-    --text:        #f0f4ff;
-    --text2:       #8ea3c3;
-    --accent:      #4f9cf9;
-    --accent2:     #6c63ff;
-    --danger:      #ef4444;
-    --sq-light:    #dee3e6;
-    --sq-dark:     #8ca2ad;
-    --sq-sel:      rgba(20,170,50,0.55);
-    --sq-last:     rgba(205,210,20,0.40);
+    --bg:          #1a2332;
+    --bg2:         #0f1923;
+    --card:        #1e2b3c;
+    --card-border: #2d4060;
+    --text:        #e8eef7;
+    --text2:       #7fa3cc;
+    --accent:      #4a90d9;
+    --accent2:     #5b6fd6;
+    --danger:      #e05555;
+    --sq-light:    #dee3e6;   /* chess.com blue-gray light */
+    --sq-dark:     #8ca2ad;   /* chess.com blue-gray dark  */
+    --sq-sel:      rgba(20,170,50,0.50);
+    --sq-last:     rgba(100,180,255,0.45);
     --sq-check:    rgba(220,50,50,0.55);
-    --sq-hint:     rgba(0,0,0,0.20);
-    --board-border:#1e2a3e;
-    --clock-active:#4f9cf9;
+    --sq-hint:     rgba(0,0,0,0.18);
+    --board-border:#0f1923;
+    --clock-active:#4a90d9;
 }
 [data-theme="wood"] {
-    --bg:          #2c1a0e;
-    --bg2:         #3d2612;
-    --card:        #4a3018;
-    --card-border: #6b4423;
-    --text:        #f5e8cc;
+    --bg:          #1a120a;
+    --bg2:         #261808;
+    --card:        #2e1c0c;
+    --card-border: #5a3a1a;
+    --text:        #f5e6cc;
     --text2:       #c4a068;
     --accent:      #d4a043;
     --accent2:     #e07020;
     --danger:      #c0392b;
-    --sq-light:    #f0d9b5;
-    --sq-dark:     #b58863;
-    --sq-sel:      rgba(20,150,40,0.55);
-    --sq-last:     rgba(205,210,20,0.40);
+    --sq-light:    #f0d9b5;   /* lichess beige light  */
+    --sq-dark:     #b58863;   /* lichess brown dark   */
+    --sq-sel:      rgba(20,160,40,0.55);
+    --sq-last:     rgba(205,210,20,0.42);
     --sq-check:    rgba(220,50,50,0.55);
-    --sq-hint:     rgba(0,0,0,0.20);
-    --board-border:#2c1a0e;
+    --sq-hint:     rgba(0,0,0,0.22);
+    --board-border:#1a120a;
     --clock-active:#d4a043;
 }
 
@@ -268,22 +268,27 @@ body {
 .sq.last-move { background: var(--sq-last) !important; }
 .sq.in-check { background: var(--sq-check) !important; }
 
-/* Piece symbol */
-.piece {
-    font-size: clamp(1.2rem, 5vmin, 2.8rem);
+/* Piece SVG image */
+.piece-img {
+    width: 87%;
+    height: 87%;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+    display: block;
+    /* subtle drop shadow for depth */
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35));
+    transition: transform 0.08s ease;
+}
+.sq:hover .piece-img { transform: scale(1.06); }
+.sq.selected .piece-img { transform: scale(1.08); }
+
+/* Unicode fallback */
+.piece-uni {
+    font-size: clamp(1.1rem, 4.5vmin, 2.4rem);
     line-height: 1;
     pointer-events: none;
-    transition: transform 0.1s;
-}
-.piece.white {
-    color: #fff;
-    text-shadow: 0 0 2px #000, 0 0 4px #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
-    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8));
-}
-.piece.black {
-    color: #1a1a1a;
-    text-shadow: 0 0 2px #fff8, 0 0 4px #fff4;
-    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+    user-select: none;
 }
 
 /* Move hint dot */
