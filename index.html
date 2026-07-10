@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Antigravity Chess - Premium PC Online Chess</title>
+    <!-- CSS Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+    <!-- FontAwesome for UI Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chess.js for Bulletproof Game Logic -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <!-- PeerJS for WebRTC Serverless P2P Connection -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body data-theme="monochrome">
+    <!-- Main Header -->
+    <header>
+        <div class="logo-container">
+            <span class="logo-icon"><i class="fa-solid fa-chess-knight"></i></span>
+            <span class="logo-text">ANTIGRAVITY CHESS</span>
+        </div>
+        
+        <div style="display: flex; align-items: center; gap: 1.5rem;">
+            <!-- Theme Selection -->
+            <div class="theme-selector">
+                <button id="theme-mono-btn" class="theme-btn active" onclick="setTheme('monochrome')">Monochrome</button>
+                <button id="theme-wood-btn" class="theme-btn" onclick="setTheme('wood')">Wooden</button>
+            </div>
+            
+            <!-- Connection Status Badge -->
+            <div class="network-badge">
+                <span id="network-dot" class="badge-dot"></span>
+                <span id="network-status">Loading Network...</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Screens Container -->
+    <main>
+        <!-- 1. LOBBY SCREEN -->
+        <section id="lobby-screen" class="screen active">
+            <div class="lobby-hero">
+                <h1>Polished Online Chess</h1>
+                <p>Play peer-to-peer multiplayer with low latency, or practice offline against a smart local AI engine.</p>
+            </div>
+
+            <div class="lobby-grid">
+                <!-- Card A: Create Multiplayer Match -->
+                <div class="lobby-card glass-panel">
+                    <h2><i class="fa-solid fa-square-plus"></i> Host Online Game</h2>
+                    <p>Create a game room and invite a friend to play by sharing your link. Zero installation, peer-to-peer connection.</p>
+                    
+                    <!-- Time Control Settings -->
+                    <div class="form-group">
+                        <label>Time Control</label>
+                        <div class="time-preset-grid">
+                            <button class="preset-btn active" data-time="3" data-inc="2">3+2 Blitz</button>
+                            <button class="preset-btn" data-time="10" data-inc="0">10+0 Rapid</button>
+                            <button class="preset-btn" data-time="custom" id="custom-time-btn">Custom Clock</button>
+                        </div>
+                        
+                        <!-- Custom Time Input Drawer -->
+                        <div class="custom-time-inputs" id="custom-time-inputs-div" style="display: none;">
+                            <div class="form-group">
+                                <label for="custom-minutes">Minutes</label>
+                                <input type="number" id="custom-minutes" value="5" min="1" max="180">
+                            </div>
+                            <div class="form-group">
+                                <label for="custom-increment">Increment (sec)</label>
+                                <input type="number" id="custom-increment" value="3" min="0" max="60">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" id="btn-host-game" style="margin-top: auto;">
+                        <i class="fa-solid fa-server"></i> Create Game & Get Link
+                    </button>
+
+                    <!-- Display Box directly inside the card -->
+                    <div id="host-connection-details" style="display: none; margin-top: auto; padding: 1rem; border-radius: 10px; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--bg-panel-border); flex-direction: column; gap: 0.75rem;">
+                        <div id="host-status-text" style="font-size: 0.85rem; color: var(--text-secondary); text-align: center;">
+                            Connecting to matchmaking...
+                        </div>
+                        
+                        <div id="host-details-content" style="display: none; flex-direction: column; gap: 0.75rem;">
+                            <div class="form-group">
+                                <label style="font-size: 0.75rem;">Room Code (Send to desktop app friend)</label>
+                                <div style="font-size: 1.3rem; font-weight: 800; color: var(--text-primary); text-align: center; letter-spacing: 2px; padding: 0.5rem; background: rgba(255, 255, 255, 0.03); border-radius: 8px; border: 1px dashed var(--bg-panel-border);" id="card-invite-code">
+                                    ...
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label style="font-size: 0.75rem;">Invitation Link (Send to browser friend)</label>
+                                <div class="input-container">
+                                    <input type="text" id="card-invite-link" readonly value="Generating Link..." style="font-size: 0.85rem; padding: 0.5rem 0.75rem;">
+                                    <button class="btn btn-primary" id="btn-copy-card-link" style="padding: 0.5rem 0.75rem; border-radius: 10px;" title="Copy Link"><i class="fa-solid fa-copy"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button class="btn btn-secondary" id="btn-cancel-card-host" style="font-size: 0.85rem; padding: 0.5rem 1rem;">Cancel Room</button>
+                    </div>
+                </div>
+
+                <!-- Card B: Join Online / Practice Offline -->
+                <div class="lobby-card glass-panel">
+                    <h2><i class="fa-solid fa-right-to-bracket"></i> Join Room / Practice</h2>
+                    
+                    <!-- Join Room Form -->
+                    <div class="form-group" style="border-bottom: 1px solid var(--bg-panel-border); padding-bottom: 1.25rem;">
+                        <label for="room-id-input">Room Code / Peer ID</label>
+                        <div class="input-container">
+                            <input type="text" id="room-id-input" placeholder="Enter Friend's Peer ID...">
+                            <button class="btn btn-primary" id="btn-join-game"><i class="fa-solid fa-play"></i> Join</button>
+                        </div>
+                    </div>
+                    
+                    <!-- AI Player Practice -->
+                    <div class="form-group">
+                        <h2><i class="fa-solid fa-robot"></i> Practice Offline</h2>
+                        <p style="margin-bottom: 0.75rem;">Play against the local chess engine. No internet connection required.</p>
+                        
+                        <label for="ai-difficulty">Engine Difficulty</label>
+                        <div class="input-container">
+                            <select id="ai-difficulty">
+                                <option value="easy">Easy (Lvl 1 - Minimax Depth 2)</option>
+                                <option value="medium" selected>Medium (Lvl 2 - Minimax Depth 3)</option>
+                                <option value="hard">Hard (Lvl 3 - Minimax Depth 4)</option>
+                            </select>
+                            <button class="btn btn-secondary" id="btn-play-ai"><i class="fa-solid fa-brain"></i> Play AI</button>
+                        </div>
+                    </div>
+
+                    <!-- Pass & Play -->
+                    <button class="btn btn-secondary" id="btn-play-local" style="margin-top: 0.5rem;">
+                        <i class="fa-solid fa-people-arrows"></i> Local Pass & Play
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. GAME SCREEN -->
+        <section id="game-screen" class="screen">
+            <!-- Chessboard Column -->
+            <div class="board-container">
+                <!-- Custom SVG Chess Board renders inside here -->
+                <div id="board-mount"></div>
+            </div>
+
+            <!-- Sidebar Info & Chat Column -->
+            <div class="game-sidebar glass-panel">
+                <!-- Top Header Info -->
+                <div class="sidebar-header">
+                    <div>
+                        <h3 id="sidebar-match-title">VS Match</h3>
+                        <span id="match-type-indicator" style="font-size: 0.8rem; color: var(--text-secondary);">Blitz 3+2</span>
+                    </div>
+                    <button class="btn-icon" id="btn-flip-board" title="Flip Board"><i class="fa-solid fa-rotate"></i></button>
+                </div>
+
+                <!-- Opponent Panel -->
+                <div class="player-bar" id="player-opponent-bar">
+                    <div class="player-info">
+                        <div class="player-avatar" id="avatar-opponent">B</div>
+                        <div>
+                            <div class="player-name" id="name-opponent">Opponent</div>
+                            <div class="captured-list" id="captured-by-opponent"></div>
+                        </div>
+                    </div>
+                    <div class="game-clock" id="clock-opponent">10:00</div>
+                </div>
+
+                <!-- Tabs Selector -->
+                <div class="sidebar-tabs">
+                    <button class="tab-btn active" id="tab-moves-btn" onclick="switchTab('moves')">Move History</button>
+                    <button class="tab-btn" id="tab-chat-btn" onclick="switchTab('chat')">Live Chat</button>
+                </div>
+
+                <!-- Tab A: Move List -->
+                <div class="tab-content active" id="tab-content-moves">
+                    <div class="moves-list" id="moves-log-div">
+                        <!-- Moves appended programmatically -->
+                    </div>
+                </div>
+
+                <!-- Tab B: Chat Room -->
+                <div class="tab-content" id="tab-content-chat">
+                    <div class="chat-container">
+                        <div class="chat-history" id="chat-history-div">
+                            <div class="chat-bubble system">Connecting to chat...</div>
+                        </div>
+                        <div class="chat-input-row">
+                            <input type="text" id="chat-input-box" placeholder="Type a message...">
+                            <button class="btn btn-primary" id="btn-send-chat" style="padding: 0.75rem;"><i class="fa-solid fa-paper-plane"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Local Player Panel -->
+                <div class="player-bar active" id="player-local-bar">
+                    <div class="player-info">
+                        <div class="player-avatar" id="avatar-local">W</div>
+                        <div>
+                            <div class="player-name" id="name-local">Local Player</div>
+                            <div class="captured-list" id="captured-by-local"></div>
+                        </div>
+                    </div>
+                    <div class="game-clock" id="clock-local">10:00</div>
+                </div>
+
+                <!-- Game Control Action Buttons -->
+                <div class="game-controls">
+                    <button class="btn btn-secondary" style="flex: 1;" id="btn-resign-match"><i class="fa-solid fa-flag"></i> Resign</button>
+                    <button class="btn btn-secondary" style="flex: 1;" id="btn-offer-draw"><i class="fa-solid fa-handshake"></i> Draw</button>
+                    <button class="btn btn-primary" style="flex: 1.2; display: none;" id="btn-rematch"><i class="fa-solid fa-arrows-rotate"></i> Rematch</button>
+                    <button class="btn btn-secondary" style="flex: 1;" id="btn-exit-lobby"><i class="fa-solid fa-house"></i> Home</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 3. MODALS OVERLAYS -->
+    <!-- Promotion Modal -->
+    <div class="modal-overlay" id="promotion-overlay">
+        <div class="modal-content glass-panel">
+            <h2 class="modal-title">Pawn Promotion</h2>
+            <p class="modal-body">Select a piece to promote your pawn to:</p>
+            <div class="promotion-pieces" id="promo-pieces-container">
+                <!-- Interactive piece options will load here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Match Host Waiting Link Modal -->
+    <div class="modal-overlay" id="host-link-overlay">
+        <div class="modal-content glass-panel" style="max-width: 480px;">
+            <h2 class="modal-title">Waiting for Opponent</h2>
+            <p class="modal-body">Copy the invitation link below and share it with your friend to connect instantly:</p>
+            
+            <div class="input-container" style="margin: 0.5rem 0;">
+                <input type="text" id="invite-link-textbox" readonly value="Generating Link...">
+                <button class="btn btn-primary" id="btn-copy-invite-link" title="Copy Link"><i class="fa-solid fa-copy"></i></button>
+            </div>
+            
+            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                Or share the Room Code: <strong id="invite-code-display" style="color: var(--text-primary);">...</strong>
+            </div>
+            
+            <button class="btn btn-secondary" id="btn-cancel-host">Cancel Room</button>
+        </div>
+    </div>
+
+    <!-- Game Over Announcement Modal -->
+    <div class="modal-overlay" id="gameover-overlay">
+        <div class="modal-content glass-panel">
+            <h2 class="modal-title" id="gameover-title">Checkmate!</h2>
+            <p class="modal-body" id="gameover-body">White wins by checkmate.</p>
+            <div style="display: flex; gap: 0.75rem;">
+                <button class="btn btn-primary" style="flex: 1;" id="btn-gameover-rematch">Offer Rematch</button>
+                <button class="btn btn-secondary" style="flex: 1;" id="btn-gameover-close">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clipboard Copy Toast Notification -->
+    <div class="toast-msg" id="toast-message">Link copied to clipboard!</div>
+
+    <!-- Sound effects tag placeholder (Web Audio API fallback initialized in app.js) -->
+
+    <!-- Core App JS files loaded in order -->
+    <script src="network.js"></script>
+    <script src="game.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
