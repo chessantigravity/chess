@@ -22,7 +22,7 @@ const ChessGame = (() => {
         const src = PIECE_CDN + key + '.svg';
         // Render as img; if src fails, swap to unicode text fallback
         return `<img class="piece-img" src="${src}" alt="${uni}"
-                     draggable="true"
+                     draggable="false"
                      onerror="this.outerHTML='<span class=\'piece-uni\'>${uni}</span>'">`;
     }
 
@@ -33,6 +33,12 @@ const ChessGame = (() => {
     let selected    = null;  // algebraic square string or null
     let legalMoves  = [];    // verbose moves from selected square
     let pendingPromo = null; // { from, to }
+
+    // Pointer-based Drag & Drop state variables
+    let dragPiece   = null;  // cloned piece img element currently being dragged
+    let dragStartSq = null;  // starting square coordinate string (e.g. "e2")
+    let dragOffsetX = 0;     // horizontal offset of pointer from piece center
+    let dragOffsetY = 0;     // vertical offset of pointer from piece center
 
     /* ---------- Coordinate helpers ---------- */
     const files = 'abcdefgh';
@@ -140,73 +146,8 @@ const ChessGame = (() => {
             if (cell) handleClick(cell.getAttribute('data-sq'));
         };
 
-        // HTML5 Drag & Drop event bindings
-        boardEl.ondragstart = (e) => {
-            const cell = e.target.closest('[data-sq]');
-            if (!cell) return;
-            const fromSq = cell.getAttribute('data-sq');
-            if (!isMyTurn()) { e.preventDefault(); return; }
-
-            const piece = chessEngine.get(fromSq);
-            if (!piece || piece.color !== chessEngine.turn()) {
-                e.preventDefault();
-                return;
-            }
-
-            // Set dynamic drag data and local dragging states
-            selected = fromSq;
-            legalMoves = chessEngine.moves({ square: fromSq, verbose: true });
-            
-            e.dataTransfer.setData('text/plain', fromSq);
-            e.dataTransfer.effectAllowed = 'move';
-            
-            // Re-render board to display legal move dots / rings
-            render();
-        };
-
-        boardEl.ondragover = (e) => {
-            e.preventDefault(); // crucial to allow drop event
-        };
-
-        boardEl.ondragenter = (e) => {
-            const cell = e.target.closest('[data-sq]');
-            if (!cell) return;
-            const toSq = cell.getAttribute('data-sq');
-            // Visual feedback: only highlight legal squares
-            if (selected && legalMoves.some(m => m.to === toSq)) {
-                cell.classList.add('drag-hover');
-            }
-        };
-
-        boardEl.ondragleave = (e) => {
-            const cell = e.target.closest('[data-sq]');
-            if (cell) {
-                cell.classList.remove('drag-hover');
-            }
-        };
-
-        boardEl.ondrop = (e) => {
-            e.preventDefault();
-            const cell = e.target.closest('[data-sq]');
-            if (!cell) return;
-            const toSq = cell.getAttribute('data-sq');
-            const fromSq = e.dataTransfer.getData('text/plain');
-
-            // Reset drag hovered styling on all cells
-            document.querySelectorAll('.sq').forEach(el => el.classList.remove('drag-hover'));
-
-            if (fromSq && selected === fromSq && legalMoves.some(m => m.to === toSq)) {
-                attemptMove(fromSq, toSq);
-            } else {
-                selected = null;
-                legalMoves = [];
-                render();
-            }
-        };
-
-        boardEl.ondragend = (e) => {
-            document.querySelectorAll('.sq').forEach(el => el.classList.remove('drag-hover'));
-        };
+        // Attach custom pointer drag-and-drop handler
+        initPointerDrag(boardEl);
     }
 
     /* ---------- Click handler ---------- */
@@ -234,6 +175,148 @@ const ChessGame = (() => {
         legalMoves = [];
         render();
     }
+
+    /* ---------- Pointer Drag & Drop Handlers ---------- */
+    function initPointerDrag(boardEl) {
+        boardEl.onpointerdown = (e) => {
+            // Only handle left click / single touch
+            if (e.button !== 0 && e.pointerType === 'mouse') return;
+            
+            const cell = e.target.closest('[data-sq]');
+            if (!cell) return;
+            
+            const sqName = cell.getAttribute('data-sq');
+            if (!isMyTurn()) return;
+            
+            const piece = chessEngine.get(sqName);
+            if (!piece || piece.color !== chessEngine.turn()) return;
+            
+            const pieceImg = cell.querySelector('.piece-img');
+            if (!pieceImg) return;
+            
+            // Prevent default dragging / selection behavior
+            e.preventDefault();
+            
+            dragStartSq = sqName;
+            
+            // Set selections
+            selected = sqName;
+            legalMoves = chessEngine.moves({ square: sqName, verbose: true });
+            
+            // Render first to display legal dots / rings
+            render();
+            
+            // Get fresh DOM elements since render() replaced the DOM
+            const newCell = boardEl.querySelector(`[data-sq="${sqName}"]`);
+            if (!newCell) return;
+            const newPieceImg = newCell.querySelector('.piece-img');
+            if (!newPieceImg) return;
+            
+            // Make original square piece semi-transparent (placeholder)
+            newPieceImg.style.opacity = '0.25';
+            
+            // Create cloned drag element
+            const cellRect = newCell.getBoundingClientRect();
+            dragPiece = newPieceImg.cloneNode(true);
+            dragPiece.style.position = 'fixed';
+            dragPiece.style.width = `${cellRect.width}px`;
+            dragPiece.style.height = `${cellRect.height}px`;
+            dragPiece.style.opacity = '1';
+            dragPiece.style.pointerEvents = 'none';
+            dragPiece.style.zIndex = '9999';
+            dragPiece.style.transition = 'none';
+            
+            // Style the picked-up piece with soft elevated drop shadow
+            dragPiece.style.filter = 'drop-shadow(0 10px 20px rgba(0,0,0,0.35))';
+            
+            // Center the clone on the pointer
+            dragOffsetX = cellRect.width / 2;
+            dragOffsetY = cellRect.height / 2;
+            
+            const x = e.clientX - dragOffsetX;
+            const y = e.clientY - dragOffsetY;
+            dragPiece.style.left = '0px';
+            dragPiece.style.top = '0px';
+            dragPiece.style.transform = `translate3d(${x}px, ${y}px, 0) scale(1.08)`;
+            
+            document.body.appendChild(dragPiece);
+            
+            // Bind document listeners to track dragging globally
+            document.addEventListener('pointermove', onPointerMove);
+            document.addEventListener('pointerup', onPointerUp);
+        };
+    }
+
+    function onPointerMove(e) {
+        if (!dragPiece) return;
+        
+        const x = e.clientX - dragOffsetX;
+        const y = e.clientY - dragOffsetY;
+        dragPiece.style.transform = `translate3d(${x}px, ${y}px, 0) scale(1.08)`;
+        
+        // Find current square target under the cursor
+        const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+        const cell = targetEl ? targetEl.closest('[data-sq]') : null;
+        
+        // Remove hover highlights from all squares
+        document.querySelectorAll('.sq').forEach(el => el.classList.remove('drag-hover'));
+        
+        if (cell) {
+            const toSq = cell.getAttribute('data-sq');
+            if (legalMoves.some(m => m.to === toSq)) {
+                cell.classList.add('drag-hover');
+            }
+        }
+    }
+
+    function onPointerUp(e) {
+        if (!dragPiece) return;
+        
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+        
+        // Remove hover overlays
+        document.querySelectorAll('.sq').forEach(el => el.classList.remove('drag-hover'));
+        
+        const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+        const cell = targetEl ? targetEl.closest('[data-sq]') : null;
+        const toSq = cell ? cell.getAttribute('data-sq') : null;
+        
+        const fromSq = dragStartSq;
+        dragStartSq = null;
+        
+        if (toSq && legalMoves.some(m => m.to === toSq)) {
+            // Drop piece & execute move
+            if (dragPiece.parentNode) dragPiece.parentNode.removeChild(dragPiece);
+            dragPiece = null;
+            
+            attemptMove(fromSq, toSq);
+        } else {
+            // Animate snap back to original square coordinate smoothly
+            const sourceCell = document.querySelector(`[data-sq="${fromSq}"]`);
+            if (sourceCell) {
+                const rect = sourceCell.getBoundingClientRect();
+                dragPiece.style.transition = 'transform 0.18s cubic-bezier(0.25, 1, 0.5, 1)';
+                const tx = rect.left;
+                const ty = rect.top;
+                dragPiece.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(1.0)`;
+                
+                const elToRemove = dragPiece;
+                dragPiece = null;
+                setTimeout(() => {
+                    if (elToRemove && elToRemove.parentNode) {
+                        elToRemove.parentNode.removeChild(elToRemove);
+                    }
+                    render(); // restores opacity of piece to 1
+                }, 180);
+            } else {
+                if (dragPiece.parentNode) dragPiece.parentNode.removeChild(dragPiece);
+                dragPiece = null;
+                render();
+            }
+        }
+    }
+
 
     /* ---------- Attempt a move (handles promotion) ---------- */
     function attemptMove(from, to, promo) {
