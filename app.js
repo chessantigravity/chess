@@ -1,565 +1,336 @@
-// Core Application Coordinator for Antigravity Chess
-// Coordinates page routing, UI inputs, game mode setup, timers, and SFX engine
+/* =============================================================
+   ANTIGRAVITY CHESS — App Coordinator (app.js)
+   Handles UI, routing, timers, lobbying, chat
+   ============================================================= */
 
-// Global state variables
-let appState = {
-    activeScreen: 'lobby', // 'lobby' or 'game'
-    gameMode: 'vs_ai',     // 'vs_ai', 'pass_play', 'p2p_host', 'p2p_join'
-    theme: 'monochrome',   // 'monochrome' or 'wood'
-    clockPreset: { time: 3, inc: 2 }, // minutes, increment in seconds
+/* Global app state accessible by game.js and network.js */
+window.APP = {
+    mode:          'ai',          // 'ai' | 'pass' | 'online'
+    clocks:        { w: 0, b: 0, inc: 0 },
     timerInterval: null,
-    timers: {
-        w: 0, // milliseconds remaining for white
-        b: 0, // milliseconds remaining for black
-        increment: 0 // increment in milliseconds
-    },
-    turn: 'w' // active turn 'w' or 'b'
-};
+    preset:        { min: 3, inc: 2 },
 
-// Web Audio API Sound Generator
-const ChessSFX = {
-    ctx: null,
-    init() {
-        if (!this.ctx) {
-            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-    },
-    playMove() {
-        this.init();
-        const ctx = this.ctx;
-        if (ctx.state === 'suspended') ctx.resume();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(140, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.12);
-        gain.gain.setValueAtTime(0.25, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.005, ctx.currentTime + 0.12);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.12);
-    },
-    playCapture() {
-        this.init();
-        const ctx = this.ctx;
-        if (ctx.state === 'suspended') ctx.resume();
-        
-        // High impact sound + sub bounce
-        const osc1 = ctx.createOscillator();
-        const osc2 = ctx.createOscillator();
-        const gain1 = ctx.createGain();
-        const gain2 = ctx.createGain();
-        
-        osc1.connect(gain1); gain1.connect(ctx.destination);
-        osc2.connect(gain2); gain2.connect(ctx.destination);
-        
-        osc1.type = 'sine';
-        osc1.frequency.setValueAtTime(450, ctx.currentTime);
-        osc1.frequency.exponentialRampToValueAtTime(180, ctx.currentTime + 0.08);
-        gain1.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain1.gain.exponentialRampToValueAtTime(0.005, ctx.currentTime + 0.08);
-        
-        osc2.type = 'triangle';
-        osc2.frequency.setValueAtTime(120, ctx.currentTime);
-        osc2.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + 0.1);
-        gain2.gain.setValueAtTime(0.25, ctx.currentTime);
-        gain2.gain.exponentialRampToValueAtTime(0.005, ctx.currentTime + 0.1);
-        
-        osc1.start(); osc2.start();
-        osc1.stop(ctx.currentTime + 0.1); osc2.stop(ctx.currentTime + 0.1);
-    },
-    playCheck() {
-        this.init();
-        const ctx = this.ctx;
-        if (ctx.state === 'suspended') ctx.resume();
-        const playBeep = (freq, time, duration) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(freq, time);
-            gain.gain.setValueAtTime(0.18, time);
-            gain.gain.exponentialRampToValueAtTime(0.002, time + duration);
-            osc.start(time);
-            osc.stop(time + duration);
-        };
-        const t = ctx.currentTime;
-        playBeep(587.33, t, 0.12); // D5
-        playBeep(739.99, t + 0.14, 0.22); // F#5
-    },
-    playGameOver() {
-        this.init();
-        const ctx = this.ctx;
-        if (ctx.state === 'suspended') ctx.resume();
-        const t = ctx.currentTime;
-        const playBeep = (freq, time, duration) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(freq, time);
-            gain.gain.setValueAtTime(0.15, time);
-            gain.gain.exponentialRampToValueAtTime(0.002, time + duration);
-            osc.start(time);
-            osc.stop(time + duration);
-        };
-        playBeep(440, t, 0.22);
-        playBeep(554, t + 0.15, 0.22);
-        playBeep(659, t + 0.3, 0.35);
+    onMoveDone(movedColor) {
+        // Increment for the player who just moved
+        this.clocks[movedColor] += this.clocks.inc;
+        updateClockUI();
     }
 };
 
-// UI Initializations & Navigation
+/* ============================================================= */
+/*  BOOT                                                          */
+/* ============================================================= */
 document.addEventListener('DOMContentLoaded', () => {
-    // Check URL parameters for auto-joining a hosted room
-    const urlParams = new URLSearchParams(window.location.search);
-    const joinRoomId = urlParams.get('room');
-    if (joinRoomId) {
-        document.getElementById('room-id-input').value = joinRoomId;
-        // Small delay to allow PeerJS signaling initialization
-        setTimeout(() => {
-            handleJoinGame(joinRoomId);
-        }, 1200);
-    }
 
-    // Preset Time controls binding
-    const presetBtns = document.querySelectorAll('.preset-btn');
-    presetBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            presetBtns.forEach(b => b.classList.remove('active'));
+    // Auto-join from URL ?room=ID
+    const params    = new URLSearchParams(window.location.search);
+    const autoRoom  = params.get('room');
+
+    // Time preset buttons
+    document.querySelectorAll('.time-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            
-            const timePreset = btn.getAttribute('data-time');
-            const customDrawer = document.getElementById('custom-time-inputs-div');
-            
-            if (timePreset === 'custom') {
-                customDrawer.style.display = 'flex';
-                appState.clockPreset.time = parseInt(document.getElementById('custom-minutes').value) || 5;
-                appState.clockPreset.inc = parseInt(document.getElementById('custom-increment').value) || 3;
+            const min = btn.getAttribute('data-min');
+            const inc = parseInt(btn.getAttribute('data-inc') || '0');
+            const customRow = document.getElementById('custom-time-row');
+            if (min === 'custom') {
+                customRow.style.display = 'flex';
+                APP.preset.min = parseInt(document.getElementById('inp-mins').value) || 5;
+                APP.preset.inc = parseInt(document.getElementById('inp-inc').value)  || 0;
             } else {
-                customDrawer.style.display = 'none';
-                appState.clockPreset.time = parseInt(timePreset);
-                appState.clockPreset.inc = parseInt(btn.getAttribute('data-inc'));
+                customRow.style.display = 'none';
+                APP.preset.min = parseInt(min);
+                APP.preset.inc = inc;
             }
         });
     });
 
-    // Custom time input listener updates
-    document.getElementById('custom-minutes').addEventListener('change', (e) => {
-        if (document.getElementById('custom-time-btn').classList.contains('active')) {
-            appState.clockPreset.time = Math.max(1, parseInt(e.target.value) || 5);
+    document.getElementById('inp-mins').addEventListener('input', () => {
+        APP.preset.min = parseInt(document.getElementById('inp-mins').value) || 5;
+    });
+    document.getElementById('inp-inc').addEventListener('input', () => {
+        APP.preset.inc = parseInt(document.getElementById('inp-inc').value) || 0;
+    });
+
+    // Host / Join / AI / Pass
+    document.getElementById('btn-host').addEventListener('click', hostGame);
+    document.getElementById('btn-join').addEventListener('click', () => {
+        let val = document.getElementById('inp-room').value.trim();
+        if (!val) { toast('Enter a room code or link'); return; }
+        // Extract room ID from URL if pasted as full link
+        try {
+            const u = new URL(val);
+            val = u.searchParams.get('room') || val;
+        } catch(_) {}
+        joinGame(val);
+    });
+    document.getElementById('btn-cancel-host').addEventListener('click', cancelHost);
+    document.getElementById('btn-ai').addEventListener('click', startAI);
+    document.getElementById('btn-pass').addEventListener('click', startPass);
+
+    // In-game controls
+    document.getElementById('btn-resign').addEventListener('click', () => {
+        if (!confirm('Resign the game?')) return;
+        clearInterval(APP.timerInterval);
+        const winner = ChessGame.getMyColor() === 'w' ? 'Black' : 'White';
+        showGameOver('🏳️', `${winner} wins!`, 'Opponent resigned.');
+        if (APP.mode === 'online') Network.send({ type: 'resign' });
+    });
+    document.getElementById('btn-draw').addEventListener('click', () => {
+        if (APP.mode !== 'online') { toast('Draw offer only in online mode'); return; }
+        toast('Draw offer sent');
+        Network.send({ type: 'draw_offer' });
+    });
+    document.getElementById('btn-home').addEventListener('click', () => {
+        if (!confirm('Return to lobby? Game progress will be lost.')) return;
+        clearInterval(APP.timerInterval);
+        Network.disconnect();
+        showLobby();
+    });
+
+    // Game over modal
+    document.getElementById('btn-go-close').addEventListener('click', () => {
+        document.getElementById('gameover-overlay').style.display = 'none';
+    });
+    document.getElementById('btn-rematch').addEventListener('click', () => {
+        document.getElementById('gameover-overlay').style.display = 'none';
+        if (APP.mode === 'online') {
+            toast('Rematch offer sent…');
+            Network.send({ type: 'rematch_offer' });
+        } else {
+            // Offline rematch — swap colors
+            const next = ChessGame.getMyColor() === 'w' ? 'b' : 'w';
+            startMatch(next);
         }
     });
-    document.getElementById('custom-increment').addEventListener('change', (e) => {
-        if (document.getElementById('custom-time-btn').classList.contains('active')) {
-            appState.clockPreset.inc = Math.max(0, parseInt(e.target.value) || 0);
-        }
+
+    // Chat
+    document.getElementById('btn-chat-send').addEventListener('click', sendChat);
+    document.getElementById('chat-inp').addEventListener('keydown', e => {
+        if (e.key === 'Enter') sendChat();
     });
 
-    // Setup action buttons click listeners
-    document.getElementById('btn-host-game').addEventListener('click', handleHostGame);
-    document.getElementById('btn-join-game').addEventListener('click', () => {
-        const id = document.getElementById('room-id-input').value.trim();
-        if (id) handleJoinGame(id);
-        else showToast('Please enter a valid room code!');
-    });
-    
-    document.getElementById('btn-play-ai').addEventListener('click', handleStartVS_AI);
-    document.getElementById('btn-play-local').addEventListener('click', handleStartPassPlay);
-    document.getElementById('btn-copy-invite-link').addEventListener('click', copyInviteLink);
-    document.getElementById('btn-cancel-host').addEventListener('click', cancelHostRoom);
-    
-    // Inline host card listeners
-    document.getElementById('btn-copy-card-link').addEventListener('click', copyCardInviteLink);
-    document.getElementById('btn-cancel-card-host').addEventListener('click', cancelCardHostRoom);
-    
-    document.getElementById('btn-resign-match').addEventListener('click', handleResignMatch);
-    document.getElementById('btn-offer-draw').addEventListener('click', handleOfferDraw);
-    document.getElementById('btn-exit-lobby').addEventListener('click', handleExitToLobby);
-    document.getElementById('btn-gameover-close').addEventListener('click', () => {
-        document.getElementById('gameover-overlay').classList.remove('active');
-    });
+    // Network init
+    Network.init();
 
-    // Chat sending elements
-    document.getElementById('btn-send-chat').addEventListener('click', sendChatMessage);
-    document.getElementById('chat-input-box').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendChatMessage();
-    });
-
-    // Initialize Network signaling listener
-    ChessNetwork.setupPeer();
+    // Auto-join if URL has room param
+    if (autoRoom) {
+        setTimeout(() => joinGame(autoRoom), 1500);
+    }
 });
 
-// App themes changer
-function setTheme(theme) {
-    document.body.setAttribute('data-theme', theme);
-    appState.theme = theme;
-
-    const monoBtn = document.getElementById('theme-mono-btn');
-    const woodBtn = document.getElementById('theme-wood-btn');
-
-    if (theme === 'monochrome') {
-        monoBtn.classList.add('active');
-        woodBtn.classList.remove('active');
-    } else {
-        monoBtn.classList.remove('active');
-        woodBtn.classList.add('active');
-    }
-
-    // Redraw board with new theme colors if game is active
-    if (appState.activeScreen === 'game' && typeof ChessGameController !== 'undefined') {
-        ChessGameController.fullRender();
+/* ============================================================= */
+/*  THEME                                                         */
+/* ============================================================= */
+function setTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    document.getElementById('pill-mono').classList.toggle('active', t === 'mono');
+    document.getElementById('pill-wood').classList.toggle('active', t === 'wood');
+    // Re-render board if game is active (colors come from CSS vars via classes)
+    if (document.getElementById('game').classList.contains('active')) {
+        ChessGame.startGame(ChessGame.getMyColor()); // cheapest re-render
     }
 }
 
-// Show a feedback toast message
-function showToast(message) {
-    const toast = document.getElementById('toast-message');
-    toast.textContent = message;
-    toast.classList.add('show');
-    setTimeout(() => {
-        toast.classList.remove('show');
-    }, 2500);
+/* ============================================================= */
+/*  LOBBY / GAME ROUTING                                          */
+/* ============================================================= */
+function showLobby() {
+    document.getElementById('lobby').classList.add('active');
+    document.getElementById('game').classList.remove('active');
+    // Reset host UI
+    document.getElementById('btn-host').style.display = '';
+    document.getElementById('host-info').style.display = 'none';
+    Network.init(); // re-open peer
 }
 
-// Tab Switching in Game Sidebar
-function switchTab(tabName) {
-    const movesTab = document.getElementById('tab-moves-btn');
-    const chatTab = document.getElementById('tab-chat-btn');
-    const movesContent = document.getElementById('tab-content-moves');
-    const chatContent = document.getElementById('tab-content-chat');
-    
-    if (tabName === 'moves') {
-        movesTab.classList.add('active');
-        chatTab.classList.remove('active');
-        movesContent.classList.add('active');
-        chatContent.classList.remove('active');
-    } else {
-        movesTab.classList.remove('active');
-        chatTab.classList.add('active');
-        movesContent.classList.remove('active');
-        chatContent.classList.add('active');
-    }
+function showGameScreen() {
+    document.getElementById('lobby').classList.remove('active');
+    document.getElementById('game').classList.add('active');
 }
 
-// Page View Router
-function showScreen(screenId) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(screenId + '-screen').classList.add('active');
-    appState.activeScreen = screenId;
+/* ============================================================= */
+/*  HOST GAME                                                     */
+/* ============================================================= */
+function hostGame() {
+    APP.mode = 'online';
+    document.getElementById('btn-host').style.display = 'none';
+    document.getElementById('host-info').style.display = 'flex';
+    document.getElementById('host-waiting-msg').style.display = 'block';
+    document.getElementById('host-link-row').style.display = 'none';
+
+    Network.host(
+        // When peer ID is ready
+        (peerId) => {
+            document.getElementById('host-waiting-msg').style.display = 'none';
+            document.getElementById('host-link-row').style.display = 'block';
+            document.getElementById('room-code-display').textContent = peerId;
+            const link = `${location.origin}${location.pathname}?room=${peerId}`;
+            document.getElementById('invite-link-inp').value = link;
+        },
+        // When guest connects
+        () => {
+            document.getElementById('host-info').style.display = 'none';
+            document.getElementById('btn-host').style.display = '';
+            startMatch('w');
+        }
+    );
 }
 
-// ---------------- HOST GAME LOGIC ----------------
-function handleHostGame() {
-    appState.gameMode = 'p2p_host';
-    showToast('Initializing connection...');
-    
-    // UI updates: immediately hide host button and show loading inline details box
-    const hostBtn = document.getElementById('btn-host-game');
-    const detailsPanel = document.getElementById('host-connection-details');
-    const statusText = document.getElementById('host-status-text');
-    const contentPanel = document.getElementById('host-details-content');
-    
-    hostBtn.style.display = 'none';
-    detailsPanel.style.display = 'flex';
-    statusText.style.display = 'block';
-    statusText.textContent = 'Connecting to matchmaking...';
-    contentPanel.style.display = 'none';
-    
-    ChessNetwork.initializeHost((peerId) => {
-        // Peer initialized callback, display host link details inline
-        statusText.style.display = 'none';
-        contentPanel.style.display = 'flex';
-        
-        const inviteLink = `${window.location.origin}${window.location.pathname}?room=${peerId}`;
-        document.getElementById('card-invite-link').value = inviteLink;
-        document.getElementById('card-invite-code').textContent = peerId;
-    }, () => {
-        // Player connected callback (game begins!)
-        detailsPanel.style.display = 'none';
-        hostBtn.style.display = 'inline-flex';
-        
-        // Host gets white pieces
-        setupMatchState('White Player', 'Guest (Black)', 'w', true);
+function cancelHost() {
+    Network.disconnect();
+    document.getElementById('host-info').style.display = 'none';
+    document.getElementById('btn-host').style.display = '';
+}
+
+function copyLink() {
+    const link = document.getElementById('invite-link-inp').value;
+    navigator.clipboard.writeText(link).then(() => toast('Link copied!')).catch(() => {
+        document.getElementById('invite-link-inp').select();
+        document.execCommand('copy');
+        toast('Link copied!');
     });
 }
 
-function copyInviteLink() {
-    const inviteLink = document.getElementById('invite-link-textbox');
-    inviteLink.select();
-    inviteLink.setSelectionRange(0, 99999);
-    
-    try {
-        navigator.clipboard.writeText(inviteLink.value);
-        showToast('Link copied to clipboard!');
-    } catch (err) {
-        document.execCommand('copy');
-        showToast('Link copied!');
-    }
-}
-
-function copyCardInviteLink() {
-    const inviteLink = document.getElementById('card-invite-link');
-    inviteLink.select();
-    inviteLink.setSelectionRange(0, 99999);
-    
-    try {
-        navigator.clipboard.writeText(inviteLink.value);
-        showToast('Link copied to clipboard!');
-    } catch (err) {
-        document.execCommand('copy');
-        showToast('Link copied!');
-    }
-}
-
-function cancelHostRoom() {
-    document.getElementById('host-link-overlay').classList.remove('active');
-    ChessNetwork.destroyConnection();
-}
-
-function cancelCardHostRoom() {
-    const hostBtn = document.getElementById('btn-host-game');
-    const detailsPanel = document.getElementById('host-connection-details');
-    
-    detailsPanel.style.display = 'none';
-    hostBtn.style.display = 'inline-flex';
-    
-    ChessNetwork.destroyConnection();
-    showToast('Room hosting cancelled.');
-}
-
-// ---------------- JOIN GAME LOGIC ----------------
-function handleJoinGame(roomId) {
-    appState.gameMode = 'p2p_join';
-    showToast(`Joining Room: ${roomId}...`);
-    
-    ChessNetwork.connectToHost(roomId, () => {
-        // On connection successful
-        // Joiner gets black pieces
-        setupMatchState('Host (White)', 'Black Player', 'b', true);
+/* ============================================================= */
+/*  JOIN GAME                                                     */
+/* ============================================================= */
+function joinGame(roomId) {
+    APP.mode = 'online';
+    toast('Connecting…');
+    Network.join(roomId, () => {
+        // Guest always gets black
+        startMatch('b');
     });
 }
 
-// ---------------- LOCAL ENGINE AI LOGIC ----------------
-function handleStartVS_AI() {
-    appState.gameMode = 'vs_ai';
-    const diff = document.getElementById('ai-difficulty').value;
-    const desc = diff.toUpperCase();
-    
-    setupMatchState('Human Player', `Local AI (${desc})`, 'w', false);
-}
+/* ============================================================= */
+/*  OFFLINE MODES                                                 */
+/* ============================================================= */
+function startAI()   { APP.mode = 'ai';   startMatch('w'); }
+function startPass() { APP.mode = 'pass'; startMatch('w'); }
 
-// ---------------- PASS & PLAY LOGIC ----------------
-function handleStartPassPlay() {
-    appState.gameMode = 'pass_play';
-    setupMatchState('White Player', 'Black Player', 'w', false);
-}
+/* ============================================================= */
+/*  MATCH SETUP                                                   */
+/* ============================================================= */
+function startMatch(myColor) {
+    clearInterval(APP.timerInterval);
+    showGameScreen();
 
-// ---------------- MATCH SETUP AND CLOCK ENGINE ----------------
-function setupMatchState(whiteName, blackName, clientColor, isNetworkMatch) {
-    // Clear any active timer intervals
-    clearInterval(appState.timerInterval);
-    
-    // Switch Screen
-    showScreen('game');
-    
-    // Configure timers based on clockPreset settings
-    const startingMs = appState.clockPreset.time * 60 * 1000;
-    appState.timers.w = startingMs;
-    appState.timers.b = startingMs;
-    appState.timers.increment = appState.clockPreset.inc * 1000;
-    appState.turn = 'w';
-    
-    // UI indicator
-    document.getElementById('sidebar-match-title').textContent = 
-        appState.gameMode === 'vs_ai' ? 'Vs Engine AI' : 
-        appState.gameMode === 'pass_play' ? 'Local Hotseat' : 'Online Multiplayer';
-        
-    document.getElementById('match-type-indicator').textContent = 
-        `${appState.clockPreset.time}m + ${appState.clockPreset.inc}s clock`;
-    
-    // Update player displays
-    document.getElementById('name-local').textContent = clientColor === 'w' ? whiteName : blackName;
-    document.getElementById('name-opponent').textContent = clientColor === 'w' ? blackName : whiteName;
-    document.getElementById('avatar-local').textContent = clientColor === 'w' ? 'W' : 'B';
-    document.getElementById('avatar-opponent').textContent = clientColor === 'w' ? 'B' : 'W';
-    
-    // Reset sidebar elements
-    document.getElementById('moves-log-div').innerHTML = '';
-    document.getElementById('captured-by-local').innerHTML = '';
-    document.getElementById('captured-by-opponent').innerHTML = '';
-    
-    const chatHist = document.getElementById('chat-history-div');
-    chatHist.innerHTML = '';
-    if (isNetworkMatch) {
-        appendChatBubble('system', 'P2P data channel established. Good luck!');
-    } else {
-        appendChatBubble('system', 'Offline session started. Good luck!');
-    }
-    
-    updateClockDisplay();
-    
-    // Initialize Chess Logic & board visual state
-    ChessGameController.initGame(clientColor);
-    
-    // Setup controls visibility
-    document.getElementById('btn-rematch').style.display = 'none';
-    document.getElementById('btn-resign-match').style.display = 'inline-block';
-    document.getElementById('btn-offer-draw').style.display = isNetworkMatch ? 'inline-block' : 'none';
-    
-    // Start active clock if not infinity mode
+    // Reset clocks
+    const ms = APP.preset.min * 60 * 1000;
+    APP.clocks = { w: ms, b: ms, inc: APP.preset.inc * 1000 };
+
+    // Player info
+    const isOnline = APP.mode === 'online';
+    const isAI     = APP.mode === 'ai';
+    const localName = myColor === 'w' ? 'White' : 'Black';
+    const oppName   = myColor === 'w'
+        ? (isAI ? 'AI Engine' : 'Black')
+        : (isAI ? 'AI Engine' : 'White');
+
+    document.getElementById('nm-me').textContent  = localName;
+    document.getElementById('nm-opp').textContent = oppName;
+    document.getElementById('av-me').textContent  = myColor === 'w' ? 'W' : 'B';
+    document.getElementById('av-opp').textContent = myColor === 'w' ? 'B' : 'W';
+
+    document.getElementById('match-title').textContent =
+        isAI ? 'vs AI Engine' : isOnline ? 'Online Multiplayer' : 'Local Hotseat';
+    document.getElementById('match-sub').textContent =
+        `${APP.preset.min}m + ${APP.preset.inc}s`;
+
+    // Reset move log, captures, chat
+    document.getElementById('move-log').innerHTML   = '';
+    document.getElementById('cap-me').textContent   = '';
+    document.getElementById('cap-opp').textContent  = '';
+    document.getElementById('chat-log').innerHTML   = '';
+
+    const chatGreet = isOnline ? '🔗 Connected to opponent!' : '♟ Game started. Good luck!';
+    addChatMsg('sys', chatGreet);
+
+    updateClockUI();
+
+    // Start chess engine
+    ChessGame.startGame(myColor);
+
+    // Start clock
     startClock();
 }
 
+/* ============================================================= */
+/*  CLOCK                                                         */
+/* ============================================================= */
 function startClock() {
-    clearInterval(appState.timerInterval);
-    appState.timerInterval = setInterval(() => {
-        const turn = ChessGameController.getTurn();
-        appState.turn = turn;
-        
-        // Update styling highlights on local/opponent panel
-        const localColor = ChessGameController.getClientColor();
-        const localBar = document.getElementById('player-local-bar');
-        const oppBar = document.getElementById('player-opponent-bar');
-        
-        if (turn === localColor) {
-            localBar.classList.add('active');
-            oppBar.classList.remove('active');
-            
-            appState.timers[localColor] = Math.max(0, appState.timers[localColor] - 100);
-        } else {
-            oppBar.classList.add('active');
-            localBar.classList.remove('active');
-            
-            const oppColor = localColor === 'w' ? 'b' : 'w';
-            appState.timers[oppColor] = Math.max(0, appState.timers[oppColor] - 100);
-        }
-        
-        updateClockDisplay();
-        
-        // Time out check
-        if (appState.timers.w <= 0) {
-            handleTimeOut('w');
-        } else if (appState.timers.b <= 0) {
-            handleTimeOut('b');
-        }
+    clearInterval(APP.timerInterval);
+    APP.timerInterval = setInterval(() => {
+        const turn      = ChessGame.getTurn();
+        const myColor   = ChessGame.getMyColor();
+        const localBar  = document.getElementById('strip-me');
+        const oppBar    = document.getElementById('strip-opp');
+
+        // Highlight active player
+        localBar.classList.toggle('active', turn === myColor);
+        oppBar.classList.toggle('active',   turn !== myColor);
+
+        // Drain the active player's clock
+        APP.clocks[turn] = Math.max(0, APP.clocks[turn] - 100);
+        updateClockUI();
+
+        // Time out
+        if (APP.clocks.w <= 0) flagOut('w');
+        else if (APP.clocks.b <= 0) flagOut('b');
     }, 100);
 }
 
-function handleTimeOut(flaggedColor) {
-    clearInterval(appState.timerInterval);
-    ChessSFX.playGameOver();
-    
-    const winnerText = flaggedColor === 'w' ? 'Black wins!' : 'White wins!';
-    const reason = 'on time';
-    
-    announceGameOver(winnerText, reason);
-    
-    if (appState.gameMode.startsWith('p2p')) {
-        ChessNetwork.sendMatchPacket({ type: 'flag', color: flaggedColor });
-    }
+function flagOut(color) {
+    clearInterval(APP.timerInterval);
+    const winner = color === 'w' ? 'Black' : 'White';
+    showGameOver('⏰', `${winner} wins!`, 'Opponent ran out of time.');
+    if (APP.mode === 'online') Network.send({ type: 'flag', color });
 }
 
-function updateClockDisplay() {
-    const formatTime = (ms) => {
-        const totalSecs = Math.ceil(ms / 1000);
-        const mins = Math.floor(totalSecs / 60);
-        const secs = totalSecs % 60;
-        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+function updateClockUI() {
+    const fmt = (ms) => {
+        const s = Math.max(0, Math.ceil(ms / 1000));
+        return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
     };
-    
-    const localColor = ChessGameController.getClientColor();
-    const oppColor = localColor === 'w' ? 'b' : 'w';
-    
-    document.getElementById('clock-local').textContent = formatTime(appState.timers[localColor]);
-    document.getElementById('clock-opponent').textContent = formatTime(appState.timers[oppColor]);
+    const mc = ChessGame.getMyColor();
+    const oc = mc === 'w' ? 'b' : 'w';
+    document.getElementById('clk-me').textContent  = fmt(APP.clocks[mc]);
+    document.getElementById('clk-opp').textContent = fmt(APP.clocks[oc]);
 }
 
-// Increments timer upon completing a move
-function triggerIncrement(movedColor) {
-    appState.timers[movedColor] += appState.timers.increment;
-    updateClockDisplay();
-}
-
-// ---------------- GAME OVER DIALOGS ----------------
-function announceGameOver(title, details) {
-    clearInterval(appState.timerInterval);
-    
-    document.getElementById('gameover-title').textContent = title;
-    document.getElementById('gameover-body').textContent = details;
-    document.getElementById('gameover-overlay').classList.add('active');
-    
-    // Enable rematch option button
-    document.getElementById('btn-resign-match').style.display = 'none';
-    document.getElementById('btn-offer-draw').style.display = 'none';
-    
-    if (appState.gameMode.startsWith('p2p')) {
-        document.getElementById('btn-rematch').style.display = 'inline-block';
-    }
-}
-
-// ---------------- PLAYER ACTIONS ----------------
-function handleResignMatch() {
-    if (confirm('Are you sure you want to resign the game?')) {
-        clearInterval(appState.timerInterval);
-        const localColor = ChessGameController.getClientColor();
-        const winner = localColor === 'w' ? 'Black' : 'White';
-        
-        announceGameOver(`${winner} Wins!`, 'Opponent resigned.');
-        
-        if (appState.gameMode.startsWith('p2p')) {
-            ChessNetwork.sendMatchPacket({ type: 'resign', color: localColor });
-        }
-    }
-}
-
-function handleOfferDraw() {
-    if (appState.gameMode.startsWith('p2p')) {
-        showToast('Draw offer sent...');
-        ChessNetwork.sendMatchPacket({ type: 'draw_offer' });
-    }
-}
-
-function handleExitToLobby() {
-    if (confirm('Return to Lobby? Your current game progress will be lost.')) {
-        clearInterval(appState.timerInterval);
-        showScreen('lobby');
-        ChessNetwork.destroyConnection();
-        
-        // Reset network badge
-        const badge = document.getElementById('network-dot');
-        badge.className = 'badge-dot';
-        document.getElementById('network-status').textContent = 'Loading Network...';
-        ChessNetwork.setupPeer(); // Reconnect peer signaling
-    }
-}
-
-// ---------------- SIDEBAR CHAT LOGIC ----------------
-function sendChatMessage() {
-    const box = document.getElementById('chat-input-box');
-    const msg = box.value.trim();
+/* ============================================================= */
+/*  CHAT                                                          */
+/* ============================================================= */
+function sendChat() {
+    const inp = document.getElementById('chat-inp');
+    const msg = inp.value.trim();
     if (!msg) return;
-    
-    box.value = '';
-    
-    // Add local bubble
-    appendChatBubble('local', msg);
-    
-    // Network synchronisation
-    if (appState.gameMode.startsWith('p2p')) {
-        ChessNetwork.sendMatchPacket({ type: 'chat', text: msg });
-    }
+    inp.value = '';
+    addChatMsg('me', msg);
+    if (APP.mode === 'online') Network.send({ type: 'chat', text: msg });
 }
 
-function appendChatBubble(sender, text) {
-    const container = document.getElementById('chat-history-div');
-    const bubble = document.createElement('div');
-    bubble.className = `chat-bubble ${sender}`;
-    bubble.textContent = text;
-    
-    container.appendChild(bubble);
-    container.scrollTop = container.scrollHeight;
+/* ============================================================= */
+/*  TAB SWITCHING                                                 */
+/* ============================================================= */
+function switchTab(t) {
+    const isMoves = t === 'moves';
+    document.getElementById('tab-moves').classList.toggle('active', isMoves);
+    document.getElementById('tab-chat').classList.toggle('active', !isMoves);
+    document.getElementById('pane-moves').classList.toggle('active', isMoves);
+    document.getElementById('pane-chat').classList.toggle('active', !isMoves);
+}
+
+/* ============================================================= */
+/*  TOAST                                                         */
+/* ============================================================= */
+function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), 2500);
 }

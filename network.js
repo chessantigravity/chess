@@ -1,258 +1,233 @@
-// PeerJS WebRTC P2P Matchmaking and Connection Manager
-// Synchronizes moves, game state events, in-game chat, and clock values between two clients
+/* =============================================================
+   ANTIGRAVITY CHESS — Network Layer (network.js)
+   PeerJS WebRTC P2P for online multiplayer
+   ============================================================= */
 
-const ChessNetwork = (() => {
-    let peer = null;
-    let conn = null;
-    let isConnected = false;
-    let activePeerId = '';
-    
-    // Custom PeerJS signaling configurations
-    // Uses the free hosted public broker server
-    const peerConfig = {
-        host: '0.peerjs.com',
-        port: 443,
-        path: '/',
-        secure: true,
-        debug: 1 // Only log errors
-    };
+const Network = (() => {
 
-    // Setup local PeerJS instance and connection indicators
-    function setupPeer() {
-        const badgeDot = document.getElementById('network-dot');
-        const badgeStatus = document.getElementById('network-status');
-        
-        badgeDot.className = 'badge-dot connecting';
-        badgeStatus.textContent = 'Connecting network...';
-        
+    let peer         = null;
+    let conn         = null;
+    let connected    = false;
+    let myPeerId     = '';
+    let onPeerReady  = null;
+    let onGuest      = null;
+    let onJoinCb     = null;
+
+    /* ---------- Status badge ---------- */
+    function setStatus(state, label) {
+        const dot = document.getElementById('net-dot');
+        const txt = document.getElementById('net-status');
+        dot.className = 'dot ' + (state === 'ok' ? 'ok' : state === 'err' ? 'err' : '');
+        txt.textContent = label;
+    }
+
+    /* ---------- Init / re-open peer ---------- */
+    function init() {
+        // Clean up existing peer
+        if (peer && !peer.destroyed) { peer.destroy(); }
+        peer     = null;
+        conn     = null;
+        connected = false;
+        myPeerId = '';
+
+        setStatus('', 'Connecting…');
+
         try {
-            peer = new Peer(peerConfig);
-            
-            peer.on('open', (id) => {
-                activePeerId = id;
-                badgeDot.className = 'badge-dot connected';
-                badgeStatus.textContent = 'Ready (Online)';
-                console.log('PeerJS server connection open. ID:', id);
+            peer = new Peer({
+                host: '0.peerjs.com',
+                port: 443,
+                path: '/',
+                secure: true,
+                debug: 0
             });
-            
-            peer.on('error', (err) => {
-                console.error('PeerJS error encountered:', err);
-                badgeDot.className = 'badge-dot';
-                badgeStatus.textContent = 'Network offline';
-                
+
+            peer.on('open', id => {
+                myPeerId = id;
+                setStatus('ok', 'Ready');
+                if (onPeerReady) { onPeerReady(id); onPeerReady = null; }
+            });
+
+            peer.on('error', err => {
+                console.error('Peer error:', err.type, err);
+                setStatus('err', 'Network error');
                 if (err.type === 'peer-unavailable') {
-                    showToast('Room not found! Double check the room code.');
-                    document.getElementById('lobby-screen').classList.add('active');
-                    document.getElementById('game-screen').classList.remove('active');
+                    toast('Room not found — check the room code');
                 } else {
-                    showToast(`Connection error: ${err.type}`);
+                    toast('Connection error: ' + err.type);
                 }
             });
-            
+
             peer.on('disconnected', () => {
-                console.log('PeerJS disconnected from signaling server.');
-                badgeDot.className = 'badge-dot';
-                badgeStatus.textContent = 'Signaling offline';
+                setStatus('', 'Offline');
+                // Auto-reconnect once
+                setTimeout(() => { if (peer && !peer.destroyed) peer.reconnect(); }, 2000);
             });
-            
+
+            // HOST: listen for incoming connections
+            peer.on('connection', incomingConn => {
+                if (conn) {
+                    // Room is full — reject
+                    incomingConn.on('open', () => {
+                        incomingConn.send({ type: 'room_full' });
+                        setTimeout(() => incomingConn.close(), 500);
+                    });
+                    return;
+                }
+                conn = incomingConn;
+                bindConn();
+                conn.on('open', () => {
+                    connected = true;
+                    toast('Opponent connected!');
+                    // Send clock preset to guest
+                    conn.send({ type: 'clock_sync', min: APP.preset.min, inc: APP.preset.inc });
+                    if (onGuest) { onGuest(); onGuest = null; }
+                });
+            });
+
         } catch (e) {
-            console.error('Failed to create PeerJS object:', e);
-            badgeDot.className = 'badge-dot';
-            badgeStatus.textContent = 'Error';
+            setStatus('err', 'Failed');
+            console.error('PeerJS init failed:', e);
         }
     }
 
-    // Host room - wait for connection
-    function initializeHost(onPeerIdReady, onGuestConnected) {
-        if (!peer || peer.destroyed) {
-            setupPeer();
+    /* ---------- Host ---------- */
+    function host(onReady, onGuestConnected) {
+        onGuest = onGuestConnected;
+        if (myPeerId) {
+            onReady(myPeerId);
+        } else {
+            onPeerReady = onReady;
+            if (!peer || peer.destroyed) init();
         }
-        
-        // Wait for Peer to open signaling and generate ID
-        const checkInterval = setInterval(() => {
-            if (activePeerId) {
-                clearInterval(checkInterval);
-                onPeerIdReady(activePeerId);
-            }
-        }, 100);
-        
-        // Listen for incoming client connections
-        peer.on('connection', (connection) => {
-            if (conn) {
-                // Reject connection if room is occupied
-                connection.on('open', () => {
-                    connection.send({ type: 'room_full' });
-                    setTimeout(() => connection.close(), 500);
-                });
-                return;
-            }
-            
-            conn = connection;
-            setupConnectionListeners();
-            
-            conn.on('open', () => {
-                isConnected = true;
-                showToast('Opponent connected!');
-                
-                // Transmit clock variables to Guest so both boards match clocks
-                conn.send({
-                    type: 'init_clock',
-                    time: appState.clockPreset.time,
-                    inc: appState.clockPreset.inc
-                });
-                
-                onGuestConnected();
-            });
-        });
     }
 
-    // Join room - connect to Peer ID
-    function connectToHost(hostId, onConnectedCallback) {
+    /* ---------- Join ---------- */
+    function join(hostId, onConnected) {
+        onJoinCb = onConnected;
         if (!peer || peer.destroyed) {
-            setupPeer();
+            // Wait for peer to open before connecting
+            onPeerReady = () => doConnect(hostId);
+            init();
+        } else if (!myPeerId) {
+            onPeerReady = () => doConnect(hostId);
+        } else {
+            doConnect(hostId);
         }
-        
-        showToast('Connecting to Host...');
-        
-        conn = peer.connect(hostId, {
-            reliable: true
-        });
-        
-        setupConnectionListeners();
-        
+    }
+
+    function doConnect(hostId) {
+        conn = peer.connect(hostId, { reliable: true });
+        bindConn();
         conn.on('open', () => {
-            isConnected = true;
-            showToast('Connected to room!');
-            onConnectedCallback();
+            connected = true;
+            toast('Connected to host!');
+            if (onJoinCb) { onJoinCb(); onJoinCb = null; }
         });
     }
 
-    // Bind data channel message listeners
-    function setupConnectionListeners() {
+    /* ---------- Bind data events ---------- */
+    function bindConn() {
         if (!conn) return;
-        
-        conn.on('data', (data) => {
-            console.log('Packet received:', data);
-            handleIncomingPacket(data);
-        });
-        
-        conn.on('close', () => {
-            console.log('Data connection closed by peer.');
-            handleDisconnect();
-        });
-        
-        conn.on('error', (err) => {
-            console.error('Data channel error:', err);
-            handleDisconnect();
-        });
+        conn.on('data', handlePacket);
+        conn.on('close', handleClose);
+        conn.on('error', e => { console.error('Conn error:', e); handleClose(); });
     }
 
-    // Parse packet payloads
-    function handleIncomingPacket(packet) {
-        if (!packet) return;
-        
-        switch (packet.type) {
+    /* ---------- Handle incoming packets ---------- */
+    function handlePacket(pkt) {
+        if (!pkt) return;
+        switch (pkt.type) {
+
             case 'room_full':
-                showToast('Room is already full! Redirecting home...');
-                destroyConnection();
-                handleExitToLobby();
+                toast('Room is full!');
+                disconnect();
                 break;
-                
-            case 'init_clock':
-                // Synchronize preset clocks sent from Host
-                appState.clockPreset.time = packet.time;
-                appState.clockPreset.inc = packet.inc;
-                document.getElementById('match-type-indicator').textContent = 
-                    `${packet.time}m + ${packet.inc}s clock`;
+
+            case 'clock_sync':
+                APP.preset.min = pkt.min;
+                APP.preset.inc = pkt.inc;
                 break;
-                
+
             case 'move':
-                ChessGameController.handleRemoteMove(packet.from, packet.to, packet.promotion, packet.clocks);
+                ChessGame.applyRemoteMove(pkt.from, pkt.to, pkt.promo, pkt.clocks);
                 break;
-                
+
             case 'chat':
-                appendChatBubble('remote', packet.text);
+                addChatMsg('them', pkt.text);
                 break;
-                
+
             case 'flag':
-                const loserColor = packet.color;
-                const winner = loserColor === 'w' ? 'Black' : 'White';
-                ChessGameController.announceGameOver(`${winner} Wins!`, 'Opponent flagged (out of time).');
+                clearInterval(APP.timerInterval);
+                const w = pkt.color === 'w' ? 'Black' : 'White';
+                showGameOver('⏰', `${w} wins!`, 'Opponent ran out of time.');
                 break;
-                
+
             case 'resign':
-                const resColor = packet.color;
-                const resWinner = resColor === 'w' ? 'Black' : 'White';
-                ChessGameController.announceGameOver(`${resWinner} Wins!`, 'Opponent resigned.');
+                clearInterval(APP.timerInterval);
+                const rw = ChessGame.getMyColor() === 'w' ? 'White' : 'Black';
+                showGameOver('🏳️', `${rw} wins!`, 'Opponent resigned.');
                 break;
-                
+
             case 'draw_offer':
-                if (confirm('Opponent offers a draw. Do you accept?')) {
-                    sendMatchPacket({ type: 'draw_accept' });
-                    ChessGameController.announceGameOver('Draw Agreed', 'Players agreed to a draw.');
+                if (confirm('Opponent offers a draw. Accept?')) {
+                    send({ type: 'draw_accept' });
+                    showGameOver('🤝', 'Draw', 'Agreed by both players.');
                 } else {
-                    sendMatchPacket({ type: 'draw_reject' });
+                    send({ type: 'draw_reject' });
                 }
                 break;
-                
+
             case 'draw_accept':
-                showToast('Draw accepted!');
-                ChessGameController.announceGameOver('Draw Agreed', 'Players agreed to a draw.');
+                toast('Draw accepted!');
+                showGameOver('🤝', 'Draw', 'Agreed by both players.');
                 break;
-                
+
             case 'draw_reject':
-                showToast('Opponent declined the draw offer.');
+                toast('Draw declined.');
                 break;
-                
+
             case 'rematch_offer':
-                if (confirm('Opponent offered a rematch! Swap colors and play again?')) {
-                    sendMatchPacket({ type: 'rematch_accept' });
-                    ChessGameController.resetGameAndSwapColors();
+                if (confirm('Opponent wants a rematch! Accept?')) {
+                    send({ type: 'rematch_accept' });
+                    const next = ChessGame.getMyColor() === 'w' ? 'b' : 'w';
+                    startMatch(next);
                 }
                 break;
-                
+
             case 'rematch_accept':
-                showToast('Rematch accepted!');
-                ChessGameController.resetGameAndSwapColors();
+                toast('Rematch accepted!');
+                const nc = ChessGame.getMyColor() === 'w' ? 'b' : 'w';
+                startMatch(nc);
                 break;
         }
     }
 
-    // Transmit data packets
-    function sendMatchPacket(packet) {
-        if (conn && isConnected) {
-            conn.send(packet);
+    /* ---------- Disconnect handler ---------- */
+    function handleClose() {
+        if (connected) {
+            connected = false;
+            addChatMsg('sys', '⚠️ Opponent disconnected.');
+            clearInterval(APP.timerInterval);
+        }
+        conn = null;
+    }
+
+    /* ---------- Send ---------- */
+    function send(pkt) {
+        if (conn && connected) {
+            try { conn.send(pkt); } catch(e) { console.warn('Send failed:', e); }
         }
     }
 
-    function handleDisconnect() {
-        if (isConnected) {
-            isConnected = false;
-            showToast('Opponent disconnected from game!');
-            appendChatBubble('system', 'Connection lost. Match aborted.');
-            clearInterval(appState.timerInterval);
-        }
+    /* ---------- Disconnect ---------- */
+    function disconnect() {
+        connected = false;
+        if (conn) { try { conn.close(); } catch(_){} conn = null; }
+        if (peer && !peer.destroyed) { try { peer.destroy(); } catch(_){} peer = null; }
+        myPeerId = '';
+        setStatus('', 'Offline');
     }
 
-    // Destroy active channel connections
-    function destroyConnection() {
-        isConnected = false;
-        if (conn) {
-            conn.close();
-            conn = null;
-        }
-        if (peer && !peer.destroyed) {
-            peer.destroy();
-            peer = null;
-        }
-        activePeerId = '';
-    }
+    return { init, host, join, send, disconnect };
 
-    return {
-        setupPeer: setupPeer,
-        initializeHost: initializeHost,
-        connectToHost: connectToHost,
-        sendMatchPacket: sendMatchPacket,
-        destroyConnection: destroyConnection
-    };
 })();

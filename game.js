@@ -1,619 +1,474 @@
-// Chess Board Renderer and AI Engine
-// Fixed: inline SVG colors, correct coordinate mapping, robust click/drag, unicode fallback pieces
+/* =============================================================
+   ANTIGRAVITY CHESS — Game Engine (game.js)
+   Board: pure HTML div grid + Unicode pieces (100% reliable)
+   Chess logic: chess.js 0.10.3
+   ============================================================= */
 
-const ChessGameController = (() => {
-    let game = new Chess();
-    let boardMount = null;
-    let clientColor = 'w';
-    let flipped = false;
-    let selectedSquare = null;
-    let activeMoves = [];
-    let isDragging = false;
-    let dragPiece = null;
-    let dragStartSquare = null;
-    let dragOriginX = 0;
-    let dragOriginY = 0;
-    const SQ = 12.5; // Each square is 12.5% of viewBox (100/8)
+const ChessGame = (() => {
 
-    // Unicode fallback pieces if SVG images fail to load
-    const UNICODE_PIECES = {
-        wK: '♔', wQ: '♕', wR: '♖', wB: '♗', wN: '♘', wP: '♙',
-        bK: '♚', bQ: '♛', bR: '♜', bB: '♝', bN: '♞', bP: '♟'
+    /* ---------- Unicode piece map ---------- */
+    const SYM = {
+        wK:'♔', wQ:'♕', wR:'♖', wB:'♗', wN:'♘', wP:'♙',
+        bK:'♚', bQ:'♛', bR:'♜', bB:'♝', bN:'♞', bP:'♟'
     };
 
-    // ---- AI Piece Values ----
-    const PIECE_VALUES = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+    /* ---------- State ---------- */
+    let chessEngine = null;  // chess.js instance
+    let myColor     = 'w';
+    let flipped     = false;
+    let selected    = null;  // algebraic square string or null
+    let legalMoves  = [];    // verbose moves from selected square
+    let pendingPromo = null; // { from, to }
 
-    const PST = {
-        p: [[0,0,0,0,0,0,0,0],[50,50,50,50,50,50,50,50],[10,10,20,30,30,20,10,10],[5,5,10,25,25,10,5,5],[0,0,0,20,20,0,0,0],[5,-5,-10,0,0,-10,-5,5],[5,10,10,-20,-20,10,10,5],[0,0,0,0,0,0,0,0]],
-        n: [[-50,-40,-30,-30,-30,-30,-40,-50],[-40,-20,0,0,0,0,-20,-40],[-30,0,10,15,15,10,0,-30],[-30,5,15,20,20,15,5,-30],[-30,0,15,20,20,15,0,-30],[-30,5,10,15,15,10,5,-30],[-40,-20,0,5,5,0,-20,-40],[-50,-40,-30,-30,-30,-30,-40,-50]],
-        b: [[-20,-10,-10,-10,-10,-10,-10,-20],[-10,0,0,0,0,0,0,-10],[-10,0,5,10,10,5,0,-10],[-10,5,5,10,10,5,5,-10],[-10,0,10,10,10,10,0,-10],[-10,10,10,10,10,10,10,-10],[-10,5,0,0,0,0,5,-10],[-20,-10,-10,-10,-10,-10,-10,-20]],
-        r: [[0,0,0,0,0,0,0,0],[5,10,10,10,10,10,10,5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[0,0,0,5,5,0,0,0]],
-        q: [[-20,-10,-10,-5,-5,-10,-10,-20],[-10,0,0,0,0,0,0,-10],[-10,0,5,5,5,5,0,-10],[-5,0,5,5,5,5,0,-5],[0,0,5,5,5,5,0,-5],[-10,5,5,5,5,5,0,-10],[-10,0,5,0,0,5,0,-10],[-20,-10,-10,-5,-5,-10,-10,-20]],
-        k: [[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-20,-30,-30,-40,-40,-30,-30,-20],[-10,-20,-20,-20,-20,-20,-20,-10],[20,20,0,0,0,0,20,20],[20,30,10,0,0,10,30,20]]
-    };
+    /* ---------- Coordinate helpers ---------- */
+    const files = 'abcdefgh';
+    function sq(row, col)  { return files[col] + (8 - row); }       // board coords → algebraic
+    function row(s)        { return 8 - parseInt(s[1]); }            // algebraic → row index 0-7
+    function col(s)        { return s.charCodeAt(0) - 97; }          // algebraic → col index 0-7
 
-    // ---- Coordinate Helpers ----
-    function coordsToSquare(row, col) {
-        return 'abcdefgh'[col] + (8 - row);
-    }
-
-    function squareToCoords(sq) {
-        return { row: 8 - parseInt(sq[1]), col: sq.charCodeAt(0) - 97 };
-    }
-
-    // Screen position for a logical square (accounts for flip)
-    function logicalToScreen(logRow, logCol) {
+    /* ---------- Screen square position ---------- */
+    function screenPos(logRow, logCol) {
         return {
-            sx: (flipped ? 7 - logCol : logCol) * SQ,
-            sy: (flipped ? 7 - logRow : logRow) * SQ
+            sr: flipped ? 7 - logRow : logRow,
+            sc: flipped ? 7 - logCol : logCol
         };
     }
-
-    // ---- Get Theme Colors at runtime from CSS vars ----
-    function getColors() {
-        const s = getComputedStyle(document.documentElement);
-        const get = (v) => s.getPropertyValue(v).trim() || null;
-        return {
-            light:     get('--sq-light')     || '#e2e8f0',
-            dark:      get('--sq-dark')      || '#334155',
-            highlight: get('--sq-highlight') || 'rgba(14,165,233,0.35)',
-            lastMove:  get('--sq-last-move') || 'rgba(234,179,8,0.3)',
-            check:     get('--sq-check')     || 'rgba(239,68,68,0.5)',
-            notation:  get('--board-border-text') || '#94a3b8'
-        };
+    function logicalSq(screenRow, screenCol) {
+        const lr = flipped ? 7 - screenRow : screenRow;
+        const lc = flipped ? 7 - screenCol : screenCol;
+        return sq(lr, lc);
     }
 
-    // ---- Init ----
-    function initGame(colorChoice) {
-        game = new Chess();
-        clientColor = colorChoice;
-        flipped = (clientColor === 'b');
-        selectedSquare = null;
-        activeMoves = [];
+    /* ---------- Public init ---------- */
+    function startGame(color) {
+        chessEngine = new Chess();
+        myColor  = color;
+        flipped  = (color === 'b');
+        selected = null;
+        legalMoves = [];
 
-        boardMount = document.getElementById('board-mount');
-        boardMount.style.width = '100%';
-        boardMount.style.aspectRatio = '1';
-        boardMount.style.display = 'block';
+        document.getElementById('btn-flip').onclick = () => { flipped = !flipped; render(); };
 
-        document.getElementById('btn-flip-board').onclick = () => {
-            flipped = !flipped;
-            fullRender();
-        };
+        render();
 
-        document.getElementById('btn-rematch').onclick = handleRematchRequest;
-        document.getElementById('btn-gameover-rematch').onclick = handleRematchRequest;
-
-        fullRender();
-
-        if (appState.gameMode === 'vs_ai' && clientColor === 'b') {
-            setTimeout(makeAIMove, 600);
+        // If AI plays first (we are black in AI mode)
+        if (window.APP && APP.mode === 'ai' && color === 'b') {
+            setTimeout(doAIMove, 700);
         }
     }
 
-    // ---- Full board render (squares + pieces + labels + events) ----
-    function fullRender() {
-        if (!boardMount) return;
-        const colors = getColors();
+    /* =================================================================
+       RENDER — builds the entire board HTML from scratch each call
+       This is simple, reliable, and fast enough for chess
+       ================================================================= */
+    function render() {
+        const board  = chessEngine.board();       // 8×8 array of pieces
+        const hist   = chessEngine.history({ verbose: true });
+        const lastMv = hist.length ? hist[hist.length - 1] : null;
+        const inChk  = chessEngine.in_check();
+        const kingSq = inChk ? findKing(chessEngine.turn()) : null;
 
-        let svg = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"
-            style="width:100%;height:100%;display:block;border-radius:8px;
-                   box-shadow:0 15px 35px rgba(0,0,0,0.6);
-                   border:10px solid ${getComputedStyle(document.documentElement).getPropertyValue('--board-border').trim() || '#1e293b'};
-                   user-select:none;cursor:default;"
-            id="chess-svg">`;
+        // Build hint set
+        const hintSquares = new Set(legalMoves.map(m => m.to));
 
-        // 1) Squares
-        for (let sr = 0; sr < 8; sr++) {           // screen row
-            for (let sc = 0; sc < 8; sc++) {       // screen col
-                const lr = flipped ? 7 - sr : sr;  // logical row
-                const lc = flipped ? 7 - sc : sc;  // logical col
-                const sqName = coordsToSquare(lr, lc);
+        let html = '';
+
+        for (let sr = 0; sr < 8; sr++) {   // screen rows
+            html += '<div class="board-rank">';
+            for (let sc = 0; sc < 8; sc++) { // screen cols
+                const sqName  = logicalSq(sr, sc);
+                const lr      = row(sqName);
+                const lc      = col(sqName);
+                const piece   = board[lr][lc];
                 const isLight = (lr + lc) % 2 === 0;
-                const fill = isLight ? colors.light : colors.dark;
-                svg += `<rect x="${sc*SQ}" y="${sr*SQ}" width="${SQ}" height="${SQ}"
-                              fill="${fill}" data-sq="${sqName}" class="board-sq"/>`;
+
+                // Determine CSS classes for square
+                let cls = 'sq ' + (isLight ? 'light' : 'dark');
+                if (sqName === selected)  cls += ' selected';
+                else if (lastMv && (sqName === lastMv.from || sqName === lastMv.to)) cls += ' last-move';
+                else if (inChk && sqName === kingSq) cls += ' in-check';
+
+                html += `<div class="${cls}" data-sq="${sqName}">`;
+
+                // Rank label (left column)
+                if (sc === 0) {
+                    const rankNum = flipped ? lr + 1 : 8 - lr;
+                    html += `<span class="sq-label rank">${rankNum}</span>`;
+                }
+                // File label (bottom row)
+                if (sr === 7) {
+                    html += `<span class="sq-label file">${files[lc]}</span>`;
+                }
+
+                // Move hint
+                if (hintSquares.has(sqName)) {
+                    html += piece
+                        ? '<div class="hint-ring"></div>'
+                        : '<div class="hint-dot"></div>';
+                }
+
+                // Piece
+                if (piece) {
+                    const sym   = SYM[piece.color + piece.type.toUpperCase()];
+                    const pcls  = 'piece ' + (piece.color === 'w' ? 'white' : 'black');
+                    html += `<span class="${pcls}">${sym}</span>`;
+                }
+
+                html += '</div>';
             }
+            html += '</div>';
         }
 
-        // 2) Overlay layer placeholder
-        svg += `<g id="ovl"></g>`;
+        const boardEl = document.getElementById('chess-board');
+        boardEl.innerHTML = html;
 
-        // 3) Pieces layer placeholder
-        svg += `<g id="pcl"></g>`;
-
-        // 4) Hint dots placeholder
-        svg += `<g id="hnt" pointer-events="none"></g>`;
-
-        // 5) Rank & file labels
-        for (let i = 0; i < 8; i++) {
-            const rankNum = flipped ? i + 1 : 8 - i;
-            const fileChar = 'abcdefgh'[flipped ? 7 - i : i];
-            svg += `<text x="0.6" y="${i*SQ+3.5}" font-size="3"
-                         fill="${colors.notation}" font-family="Outfit,sans-serif"
-                         font-weight="700">${rankNum}</text>`;
-            svg += `<text x="${i*SQ+9.5}" y="99.5" font-size="3"
-                         fill="${colors.notation}" font-family="Outfit,sans-serif"
-                         font-weight="700">${fileChar}</text>`;
-        }
-
-        svg += '</svg>';
-        boardMount.innerHTML = svg;
-
-        renderOverlays();
-        renderPieces();
-        bindEvents();
+        // Attach click listeners (event delegation)
+        boardEl.onclick = (e) => {
+            const cell = e.target.closest('[data-sq]');
+            if (cell) handleClick(cell.getAttribute('data-sq'));
+        };
     }
 
-    // ---- Render overlays (last move, check, selected) ----
-    function renderOverlays() {
-        const g = document.getElementById('ovl');
-        if (!g) return;
-        const colors = getColors();
-        let html = '';
-
-        // Last move
-        const hist = game.history({ verbose: true });
-        if (hist.length > 0) {
-            const lm = hist[hist.length - 1];
-            for (const sq of [lm.from, lm.to]) {
-                const c = squareToCoords(sq);
-                const { sx, sy } = logicalToScreen(c.row, c.col);
-                html += `<rect x="${sx}" y="${sy}" width="${SQ}" height="${SQ}"
-                              fill="${colors.lastMove}" pointer-events="none"/>`;
-            }
-        }
-
-        // Check king highlight
-        if (game.in_check()) {
-            const kSq = findKing(game.turn());
-            if (kSq) {
-                const c = squareToCoords(kSq);
-                const { sx, sy } = logicalToScreen(c.row, c.col);
-                html += `<rect x="${sx}" y="${sy}" width="${SQ}" height="${SQ}"
-                              fill="${colors.check}" pointer-events="none"/>`;
-            }
-        }
-
-        // Selected piece square
-        if (selectedSquare) {
-            const c = squareToCoords(selectedSquare);
-            const { sx, sy } = logicalToScreen(c.row, c.col);
-            html += `<rect x="${sx}" y="${sy}" width="${SQ}" height="${SQ}"
-                          fill="${colors.highlight}" pointer-events="none"/>`;
-        }
-
-        g.innerHTML = html;
-    }
-
-    // ---- Render pieces ----
-    function renderPieces() {
-        const g = document.getElementById('pcl');
-        if (!g) return;
-        const board = game.board();
-        let html = '';
-
-        for (let lr = 0; lr < 8; lr++) {
-            for (let lc = 0; lc < 8; lc++) {
-                const piece = board[lr][lc];
-                if (!piece) continue;
-                const { sx, sy } = logicalToScreen(lr, lc);
-                const sqName = coordsToSquare(lr, lc);
-                const key = piece.color + piece.type.toUpperCase(); // e.g. wP, bK
-
-                // Try image first; Unicode text is a reliable fallback
-                html += `<image href="assets/pieces/${key}.svg"
-                               x="${sx}" y="${sy}" width="${SQ}" height="${SQ}"
-                               class="chess-piece" data-sq="${sqName}"
-                               style="cursor:grab;"
-                               onerror="this.style.display='none';document.getElementById('txt-${sqName}').style.display='block'"/>`;
-
-                // Unicode fallback text (hidden by default)
-                const isWhite = piece.color === 'w';
-                html += `<text id="txt-${sqName}"
-                               x="${sx + SQ/2}" y="${sy + SQ*0.72}"
-                               text-anchor="middle" font-size="${SQ*0.78}"
-                               fill="${isWhite ? '#fff' : '#000'}"
-                               stroke="${isWhite ? '#000' : '#fff'}"
-                               stroke-width="0.6" paint-order="stroke"
-                               class="chess-piece" data-sq="${sqName}"
-                               style="display:none;cursor:grab;user-select:none;">${UNICODE_PIECES[key]}</text>`;
-            }
-        }
-        g.innerHTML = html;
-    }
-
-    // ---- Render move hint dots ----
-    function renderHints() {
-        const g = document.getElementById('hnt');
-        if (!g) return;
-        if (!selectedSquare || !activeMoves.length) { g.innerHTML = ''; return; }
-
-        let html = '';
-        for (const mv of activeMoves) {
-            const c = squareToCoords(mv.to);
-            const { sx, sy } = logicalToScreen(c.row, c.col);
-            const cx = sx + SQ / 2;
-            const cy = sy + SQ / 2;
-            const hasCapture = game.get(mv.to);
-            if (hasCapture) {
-                html += `<circle cx="${cx}" cy="${cy}" r="${SQ/2-0.5}"
-                                 fill="none" stroke="rgba(0,0,0,0.22)" stroke-width="2.2"/>`;
-            } else {
-                html += `<circle cx="${cx}" cy="${cy}" r="${SQ/5.5}"
-                                 fill="rgba(0,0,0,0.18)"/>`;
-            }
-        }
-        g.innerHTML = html;
-    }
-
-    // ---- Event binding ----
-    function bindEvents() {
-        const svg = document.getElementById('chess-svg');
-        if (!svg) return;
-
-        // Click handler covers squares AND pieces (via event delegation)
-        svg.addEventListener('click', (e) => {
-            const target = e.target.closest('[data-sq]');
-            if (!target) return;
-            const sq = target.getAttribute('data-sq');
-            handleClick(sq);
-        });
-
-        // Drag & drop
-        svg.addEventListener('mousedown', onDragStart);
-        svg.addEventListener('touchstart', onDragStart, { passive: false });
-        window.addEventListener('mousemove', onDragMove);
-        window.addEventListener('touchmove', onDragMove, { passive: false });
-        window.addEventListener('mouseup', onDragEnd);
-        window.addEventListener('touchend', onDragEnd);
-    }
-
+    /* ---------- Click handler ---------- */
     function handleClick(sqName) {
         if (!isMyTurn()) return;
-        const piece = game.get(sqName);
 
-        // Select own piece
-        if (piece && piece.color === game.turn()) {
-            selectedSquare = sqName;
-            activeMoves = game.moves({ square: sqName, verbose: true });
-            renderOverlays();
-            renderHints();
+        const piece = chessEngine.get(sqName);
+
+        // Clicking own piece → select it
+        if (piece && piece.color === chessEngine.turn()) {
+            selected   = sqName;
+            legalMoves = chessEngine.moves({ square: sqName, verbose: true });
+            render();
             return;
         }
 
-        // Attempt move
-        if (selectedSquare) {
-            const legal = activeMoves.find(m => m.to === sqName);
-            if (legal) {
-                doMove(selectedSquare, sqName);
-            } else {
-                selectedSquare = null;
-                activeMoves = [];
-                renderOverlays();
-                renderHints();
-            }
-        }
-    }
-
-    // ---- Drag ----
-    function onDragStart(e) {
-        if (!isMyTurn()) return;
-        const target = (e.type === 'touchstart' ? e.target : e.target).closest('[data-sq]');
-        if (!target) return;
-        const sq = target.getAttribute('data-sq');
-        const piece = game.get(sq);
-        if (!piece || piece.color !== game.turn()) return;
-
-        e.preventDefault();
-        isDragging = true;
-        dragPiece = target;
-        dragStartSquare = sq;
-        selectedSquare = sq;
-        activeMoves = game.moves({ square: sq, verbose: true });
-
-        const svg = document.getElementById('chess-svg');
-        const rect = svg.getBoundingClientRect();
-        const cx = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
-        const cy = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
-        dragOriginX = cx - rect.left;
-        dragOriginY = cy - rect.top;
-
-        renderOverlays();
-        renderHints();
-        dragPiece.style.opacity = '0.5';
-    }
-
-    function onDragMove(e) {
-        if (!isDragging) return;
-        e.preventDefault();
-    }
-
-    function onDragEnd(e) {
-        if (!isDragging) return;
-        isDragging = false;
-        if (dragPiece) dragPiece.style.opacity = '1';
-
-        const svg = document.getElementById('chess-svg');
-        if (!svg) { dragPiece = null; return; }
-        const rect = svg.getBoundingClientRect();
-        const cx = e.type === 'touchend' ? e.changedTouches[0].clientX : e.clientX;
-        const cy = e.type === 'touchend' ? e.changedTouches[0].clientY : e.clientY;
-
-        const fractionX = (cx - rect.left) / rect.width;
-        const fractionY = (cy - rect.top) / rect.height;
-        let sc = Math.floor(fractionX * 8); // screen col
-        let sr = Math.floor(fractionY * 8); // screen row
-        sc = Math.max(0, Math.min(7, sc));
-        sr = Math.max(0, Math.min(7, sr));
-
-        const lr = flipped ? 7 - sr : sr;
-        const lc = flipped ? 7 - sc : sc;
-        const dropSq = coordsToSquare(lr, lc);
-
-        const legal = activeMoves.find(m => m.to === dropSq);
-        if (legal && dropSq !== dragStartSquare) {
-            doMove(dragStartSquare, dropSq);
-        } else {
-            selectedSquare = null;
-            activeMoves = [];
-            renderOverlays();
-            renderHints();
-        }
-        dragPiece = null;
-        dragStartSquare = null;
-    }
-
-    // ---- Execute a move ----
-    function doMove(from, to, promotion = null) {
-        const piece = game.get(from);
-        if (!piece) return;
-
-        // Pawn promotion interception
-        const isPromo = piece.type === 'p' && (to[1] === '8' || to[1] === '1');
-        if (isPromo && !promotion) {
-            showPromotionDialog(from, to);
+        // Clicking a hint square → execute move
+        if (selected && legalMoves.find(m => m.to === sqName)) {
+            attemptMove(selected, sqName);
             return;
         }
 
-        const hadCapture = !!game.get(to);
-        const result = game.move({ from, to, promotion: promotion || undefined });
-        if (!result) return;
+        // Anything else → deselect
+        selected   = null;
+        legalMoves = [];
+        render();
+    }
 
-        selectedSquare = null;
-        activeMoves = [];
+    /* ---------- Attempt a move (handles promotion) ---------- */
+    function attemptMove(from, to, promo) {
+        const p = chessEngine.get(from);
+        const isPromo = p && p.type === 'p' && (to[1] === '8' || to[1] === '1');
+
+        if (isPromo && !promo) {
+            pendingPromo = { from, to };
+            showPromoDialog(p.color);
+            return;
+        }
+
+        const moveObj = { from, to };
+        if (promo) moveObj.promotion = promo;
+
+        const result = chessEngine.move(moveObj);
+        if (!result) return; // illegal
+
+        selected   = null;
+        legalMoves = [];
 
         // Sound
-        if (game.in_check()) ChessSFX.playCheck();
-        else if (hadCapture || result.flags.includes('e')) ChessSFX.playCapture();
-        else ChessSFX.playMove();
+        const hadCapture = result.captured || result.flags.includes('e');
+        if (chessEngine.in_check())  playSFX('check');
+        else if (hadCapture)         playSFX('capture');
+        else                         playSFX('move');
 
-        triggerIncrement(result.color);
-        fullRender();
-        updateCapturedDisplay();
-        appendMoveLog(result);
+        // Timer increment
+        if (window.APP) APP.onMoveDone(result.color);
 
-        // Network sync
-        if (appState.gameMode.startsWith('p2p')) {
-            ChessNetwork.sendMatchPacket({ type: 'move', from, to, promotion, clocks: appState.timers });
+        render();
+        updateCaptures();
+        appendMoveToLog(result);
+
+        // Network: send move
+        if (window.APP && APP.mode === 'online') {
+            Network.send({ type:'move', from, to, promo: promo || null, clocks: APP.clocks });
         }
 
-        checkGameEnd();
+        checkEnd();
 
         // AI response
-        if (appState.gameMode === 'vs_ai' && !game.game_over() && game.turn() === 'b') {
-            setTimeout(makeAIMove, 500);
+        if (window.APP && APP.mode === 'ai' && !chessEngine.game_over() && chessEngine.turn() === 'b') {
+            setTimeout(doAIMove, 500);
         }
     }
 
-    // ---- Handle remote peer move ----
-    function handleRemoteMove(from, to, promotion, clocks) {
-        if (clocks) appState.timers = clocks;
-        const hadCapture = !!game.get(to);
-        const result = game.move({ from, to, promotion: promotion || undefined });
+    /* ---------- Remote move received ---------- */
+    function applyRemoteMove(from, to, promo, clocks) {
+        if (clocks && window.APP) APP.clocks = clocks;
+
+        const result = chessEngine.move({ from, to, promotion: promo || undefined });
         if (!result) return;
 
-        if (game.in_check()) ChessSFX.playCheck();
-        else if (hadCapture || result.flags.includes('e')) ChessSFX.playCapture();
-        else ChessSFX.playMove();
+        const hadCapture = result.captured || result.flags.includes('e');
+        if (chessEngine.in_check())  playSFX('check');
+        else if (hadCapture)         playSFX('capture');
+        else                         playSFX('move');
 
-        triggerIncrement(result.color);
-        fullRender();
-        updateCapturedDisplay();
-        appendMoveLog(result);
-        checkGameEnd();
+        if (window.APP) APP.onMoveDone(result.color);
+        render();
+        updateCaptures();
+        appendMoveToLog(result);
+        checkEnd();
     }
 
-    // ---- Promotion dialog ----
-    function showPromotionDialog(from, to) {
-        const overlay = document.getElementById('promotion-overlay');
-        const container = document.getElementById('promo-pieces-container');
-        overlay.classList.add('active');
-
-        const color = game.turn();
+    /* ---------- Promotion dialog ---------- */
+    function showPromoDialog(color) {
+        const choices = ['q','r','b','n'];
+        const names   = { q:'Queen', r:'Rook', b:'Bishop', n:'Knight' };
         let html = '';
-        for (const type of ['q', 'r', 'b', 'n']) {
-            const key = color + type.toUpperCase();
-            html += `<div class="promo-option" data-type="${type}" style="font-size:3rem;text-align:center;line-height:1.2;">
-                        <img src="assets/pieces/${key}.svg" style="width:80%;height:80%;"
-                             onerror="this.style.display='none';this.nextSibling.style.display='block'"/>
-                        <span style="display:none;">${UNICODE_PIECES[key]}</span>
-                     </div>`;
+        for (const t of choices) {
+            const sym = SYM[color + t.toUpperCase()];
+            html += `<div class="promo-piece" title="${names[t]}" data-promo="${t}">${sym}</div>`;
         }
-        container.innerHTML = html;
-        container.querySelectorAll('.promo-option').forEach(opt => {
-            opt.onclick = () => {
-                overlay.classList.remove('active');
-                doMove(from, to, opt.getAttribute('data-type'));
-            };
-        });
+        document.getElementById('promo-choices').innerHTML = html;
+        document.getElementById('promo-overlay').style.display = 'flex';
+
+        document.getElementById('promo-choices').onclick = (e) => {
+            const el = e.target.closest('[data-promo]');
+            if (!el || !pendingPromo) return;
+            document.getElementById('promo-overlay').style.display = 'none';
+            const { from, to } = pendingPromo;
+            pendingPromo = null;
+            attemptMove(from, to, el.getAttribute('data-promo'));
+        };
     }
 
-    // ---- Helpers ----
-    function findKing(color) {
-        const board = game.board();
-        for (let r = 0; r < 8; r++)
-            for (let c = 0; c < 8; c++)
-                if (board[r][c]?.type === 'k' && board[r][c]?.color === color)
-                    return coordsToSquare(r, c);
-        return null;
-    }
+    /* ---------- Move log ---------- */
+    function appendMoveToLog(result) {
+        const log  = document.getElementById('move-log');
+        const hist = chessEngine.history();
+        const num  = Math.ceil(hist.length / 2);
 
-    function isMyTurn() {
-        const t = game.turn();
-        if (appState.gameMode === 'pass_play') return true;
-        if (appState.gameMode === 'vs_ai') return t === 'w';
-        if (appState.gameMode.startsWith('p2p')) return t === clientColor;
-        return false;
-    }
-
-    function updateCapturedDisplay() {
-        const board = game.board();
-        const init = { w:{p:8,n:2,b:2,r:2,q:1}, b:{p:8,n:2,b:2,r:2,q:1} };
-        for (let r = 0; r < 8; r++)
-            for (let c = 0; c < 8; c++) {
-                const p = board[r][c];
-                if (p && p.type !== 'k') init[p.color][p.type]--;
-            }
-        const icons = { p:'♟', n:'♞', b:'♝', r:'♜', q:'♛' };
-        const toHtml = (counts) => Object.entries(counts)
-            .filter(([,n]) => n > 0)
-            .map(([t,n]) => `<span title="${n}x ${t.toUpperCase()}">${icons[t].repeat(n)}</span>`)
-            .join('');
-
-        const opp = clientColor === 'w' ? 'b' : 'w';
-        document.getElementById('captured-by-local').innerHTML = toHtml(init[opp]);
-        document.getElementById('captured-by-opponent').innerHTML = toHtml(init[clientColor]);
-    }
-
-    function appendMoveLog(result) {
-        const log = document.getElementById('moves-log-div');
-        const hist = game.history();
-        const num = Math.ceil(hist.length / 2);
-        if (hist.length % 2 !== 0) {
+        if (hist.length % 2 === 1) { // White just moved
             const row = document.createElement('div');
-            row.style.display = 'contents';
             row.id = `mr-${num}`;
-            row.innerHTML = `<span class="move-num">${num}.</span>
-                             <span class="move-notation">${result.san}</span>
-                             <span class="move-notation" id="mb-${num}"></span>`;
+            row.style.display = 'contents';
+            row.innerHTML =
+                `<span class="mn">${num}.</span>` +
+                `<span class="mov w-move">${result.san}</span>` +
+                `<span class="mov b-move" id="bm-${num}"></span>`;
             log.appendChild(row);
         } else {
-            const el = document.getElementById(`mb-${num}`);
+            const el = document.getElementById(`bm-${num}`);
             if (el) el.textContent = result.san;
         }
         log.scrollTop = log.scrollHeight;
     }
 
-    function checkGameEnd() {
-        if (!game.game_over()) return;
-        clearInterval(appState.timerInterval);
-        ChessSFX.playGameOver();
-        let title = 'Game Over', details = '';
-        if (game.in_checkmate()) {
-            const winner = game.turn() === 'w' ? 'Black' : 'White';
-            title = 'Checkmate!';
-            details = `${winner} wins by checkmate.`;
-        } else if (game.in_draw()) {
-            title = 'Match Drawn';
-            details = game.in_stalemate() ? 'Stalemate.' :
-                      game.insufficient_material() ? 'Insufficient material.' :
-                      game.in_threefold_repetition() ? 'Threefold repetition.' : 'Draw (50-move rule).';
-        }
-        announceGameOver(title, details);
-    }
-
-    // ---- AI (Minimax + Alpha-Beta) ----
-    function makeAIMove() {
-        const diff = document.getElementById('ai-difficulty')?.value || 'medium';
-        const depth = diff === 'easy' ? 2 : diff === 'hard' ? 4 : 3;
-        const best = getBestMove(depth);
-        if (best) doMove(best.from, best.to, best.promotion || null);
-    }
-
-    function getBestMove(depth) {
-        const moves = game.moves({ verbose: true });
-        if (!moves.length) return null;
-        moves.sort((a, b) => (b.captured?10:0)+(b.san.includes('+')?5:0) - ((a.captured?10:0)+(a.san.includes('+')?5:0)));
-        let best = null, bestVal = Infinity, beta = Infinity;
-        for (const mv of moves) {
-            game.move(mv);
-            const val = minimax(depth - 1, -Infinity, beta, true);
-            game.undo();
-            if (val < bestVal) { bestVal = val; best = mv; }
-            beta = Math.min(beta, val);
-        }
-        return best;
-    }
-
-    function minimax(depth, alpha, beta, maximizing) {
-        if (depth === 0 || game.game_over()) return evalBoard();
-        const moves = game.moves({ verbose: true });
-        if (maximizing) {
-            let max = -Infinity;
-            for (const mv of moves) {
-                game.move(mv);
-                max = Math.max(max, minimax(depth-1, alpha, beta, false));
-                game.undo();
-                alpha = Math.max(alpha, max);
-                if (beta <= alpha) break;
-            }
-            return max;
-        } else {
-            let min = Infinity;
-            for (const mv of moves) {
-                game.move(mv);
-                min = Math.min(min, minimax(depth-1, alpha, beta, true));
-                game.undo();
-                beta = Math.min(beta, min);
-                if (beta <= alpha) break;
-            }
-            return min;
-        }
-    }
-
-    function evalBoard() {
-        let score = 0;
-        const board = game.board();
+    /* ---------- Captures display ---------- */
+    function updateCaptures() {
+        const board = chessEngine.board();
+        const counts = {
+            w: { p:8,n:2,b:2,r:2,q:1 },
+            b: { p:8,n:2,b:2,r:2,q:1 }
+        };
         for (let r = 0; r < 8; r++)
             for (let c = 0; c < 8; c++) {
                 const p = board[r][c];
+                if (p && p.type !== 'k') counts[p.color][p.type]--;
+            }
+
+        const toHtml = (obj) =>
+            Object.entries(obj).filter(([,n]) => n > 0)
+                .map(([t,n]) => SYM['w'+t.toUpperCase()].repeat(n)).join('');
+
+        const opp = myColor === 'w' ? 'b' : 'w';
+        document.getElementById('cap-me').textContent  = toHtml(counts[opp]);      // pieces we captured
+        document.getElementById('cap-opp').textContent = toHtml(counts[myColor]);  // pieces they captured
+    }
+
+    /* ---------- Game end check ---------- */
+    function checkEnd() {
+        if (!chessEngine.game_over()) return;
+        clearInterval(window.APP && APP.timerInterval);
+        playSFX('end');
+
+        let emoji = '🏁', title = 'Game Over', detail = '';
+        if (chessEngine.in_checkmate()) {
+            const winner = chessEngine.turn() === 'w' ? 'Black' : 'White';
+            emoji = winner === 'White' ? '♔' : '♚';
+            title = 'Checkmate!';
+            detail = `${winner} wins by checkmate.`;
+        } else if (chessEngine.in_stalemate()) {
+            title = 'Stalemate'; detail = 'No legal moves — draw.';
+        } else if (chessEngine.in_draw()) {
+            title = 'Draw'; detail = 'Insufficient material or repetition.';
+        }
+        showGameOver(emoji, title, detail);
+    }
+
+    /* ---------- Helper: find king ---------- */
+    function findKing(color) {
+        const board = chessEngine.board();
+        for (let r = 0; r < 8; r++)
+            for (let c = 0; c < 8; c++) {
+                const p = board[r][c];
+                if (p && p.type === 'k' && p.color === color) return sq(r, c);
+            }
+        return null;
+    }
+
+    function isMyTurn() {
+        const t = chessEngine.turn();
+        if (!window.APP) return true;
+        if (APP.mode === 'pass') return true;
+        if (APP.mode === 'ai')   return t === 'w';
+        return t === myColor; // online
+    }
+
+    /* ======================
+       AI (Minimax + αβ)
+       ====================== */
+    const PV = { p:100, n:320, b:330, r:500, q:900, k:20000 };
+    const PST = {
+        p:[[0,0,0,0,0,0,0,0],[50,50,50,50,50,50,50,50],[10,10,20,30,30,20,10,10],[5,5,10,25,25,10,5,5],[0,0,0,20,20,0,0,0],[5,-5,-10,0,0,-10,-5,5],[5,10,10,-20,-20,10,10,5],[0,0,0,0,0,0,0,0]],
+        n:[[-50,-40,-30,-30,-30,-30,-40,-50],[-40,-20,0,0,0,0,-20,-40],[-30,0,10,15,15,10,0,-30],[-30,5,15,20,20,15,5,-30],[-30,0,15,20,20,15,0,-30],[-30,5,10,15,15,10,5,-30],[-40,-20,0,5,5,0,-20,-40],[-50,-40,-30,-30,-30,-30,-40,-50]],
+        b:[[-20,-10,-10,-10,-10,-10,-10,-20],[-10,0,0,0,0,0,0,-10],[-10,0,5,10,10,5,0,-10],[-10,5,5,10,10,5,5,-10],[-10,0,10,10,10,10,0,-10],[-10,10,10,10,10,10,10,-10],[-10,5,0,0,0,0,5,-10],[-20,-10,-10,-10,-10,-10,-10,-20]],
+        r:[[0,0,0,0,0,0,0,0],[5,10,10,10,10,10,10,5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[0,0,0,5,5,0,0,0]],
+        q:[[-20,-10,-10,-5,-5,-10,-10,-20],[-10,0,0,0,0,0,0,-10],[-10,0,5,5,5,5,0,-10],[-5,0,5,5,5,5,0,-5],[0,0,5,5,5,5,0,-5],[-10,5,5,5,5,5,0,-10],[-10,0,5,0,0,5,0,-10],[-20,-10,-10,-5,-5,-10,-10,-20]],
+        k:[[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-20,-30,-30,-40,-40,-30,-30,-20],[-10,-20,-20,-20,-20,-20,-20,-10],[20,20,0,0,0,0,20,20],[20,30,10,0,0,10,30,20]]
+    };
+
+    function evalBoard() {
+        let score = 0;
+        const bd = chessEngine.board();
+        for (let r = 0; r < 8; r++)
+            for (let c = 0; c < 8; c++) {
+                const p = bd[r][c];
                 if (!p) continue;
                 const ri = p.color === 'w' ? r : 7-r;
                 const ci = p.color === 'w' ? c : 7-c;
-                const val = PIECE_VALUES[p.type] + (PST[p.type]?.[ri]?.[ci] || 0);
-                score += p.color === 'w' ? val : -val;
+                const v  = PV[p.type] + (PST[p.type]?.[ri]?.[ci] || 0);
+                score += p.color === 'w' ? v : -v;
             }
         return score;
     }
 
-    // ---- Rematch ----
-    function handleRematchRequest() {
-        document.getElementById('gameover-overlay').classList.remove('active');
-        if (appState.gameMode === 'vs_ai') setupMatchState('Human Player', 'Local AI', 'w', false);
-        else if (appState.gameMode === 'pass_play') setupMatchState('White Player', 'Black Player', 'w', false);
-        else { showToast('Rematch offer sent...'); ChessNetwork.sendMatchPacket({ type: 'rematch_offer' }); }
+    function minimax(depth, alpha, beta, maximizing) {
+        if (depth === 0 || chessEngine.game_over()) return evalBoard();
+        const moves = chessEngine.moves({ verbose: true });
+        if (maximizing) {
+            let best = -Infinity;
+            for (const m of moves) {
+                chessEngine.move(m);
+                best = Math.max(best, minimax(depth-1, alpha, beta, false));
+                chessEngine.undo();
+                alpha = Math.max(alpha, best);
+                if (beta <= alpha) break;
+            }
+            return best;
+        } else {
+            let best = Infinity;
+            for (const m of moves) {
+                chessEngine.move(m);
+                best = Math.min(best, minimax(depth-1, alpha, beta, true));
+                chessEngine.undo();
+                beta = Math.min(beta, best);
+                if (beta <= alpha) break;
+            }
+            return best;
+        }
     }
 
-    function resetGameAndSwapColors() {
-        const next = clientColor === 'w' ? 'b' : 'w';
-        const myName = document.getElementById('name-local').textContent;
-        const oppName = document.getElementById('name-opponent').textContent;
-        setupMatchState(
-            next === 'w' ? myName : oppName,
-            next === 'w' ? oppName : myName,
-            next, true
+    function doAIMove() {
+        if (chessEngine.game_over()) return;
+        const diff  = parseInt(document.getElementById('sel-diff')?.value || '2');
+        const depth = diff === 1 ? 2 : diff === 3 ? 4 : 3;
+        const moves = chessEngine.moves({ verbose: true });
+        if (!moves.length) return;
+
+        // Sort: captures & checks first for better pruning
+        moves.sort((a,b) =>
+            ((b.captured?10:0)+(b.san.includes('+')?5:0)) -
+            ((a.captured?10:0)+(a.san.includes('+')?5:0))
         );
+
+        let best = null, bestVal = Infinity;
+        for (const m of moves) {
+            chessEngine.move(m);
+            const v = minimax(depth-1, -Infinity, Infinity, true);
+            chessEngine.undo();
+            if (v < bestVal) { bestVal = v; best = m; }
+        }
+        if (best) attemptMove(best.from, best.to, best.promotion || null);
     }
 
+    /* ---------- Sound FX ---------- */
+    let audioCtx = null;
+    function playSFX(type) {
+        try {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            const t = audioCtx.currentTime;
+            if (type === 'move') {
+                osc.frequency.setValueAtTime(220, t);
+                osc.frequency.exponentialRampToValueAtTime(130, t+0.1);
+                gain.gain.setValueAtTime(0.2, t); gain.gain.exponentialRampToValueAtTime(0.001, t+0.1);
+                osc.start(); osc.stop(t+0.1);
+            } else if (type === 'capture') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(400, t);
+                osc.frequency.exponentialRampToValueAtTime(120, t+0.12);
+                gain.gain.setValueAtTime(0.25, t); gain.gain.exponentialRampToValueAtTime(0.001, t+0.12);
+                osc.start(); osc.stop(t+0.12);
+            } else if (type === 'check') {
+                osc.frequency.setValueAtTime(600, t); osc.frequency.setValueAtTime(800, t+0.1);
+                gain.gain.setValueAtTime(0.18, t); gain.gain.exponentialRampToValueAtTime(0.001, t+0.25);
+                osc.start(); osc.stop(t+0.25);
+            } else {
+                osc.frequency.setValueAtTime(330, t); osc.frequency.setValueAtTime(520, t+0.1);
+                gain.gain.setValueAtTime(0.15, t); gain.gain.exponentialRampToValueAtTime(0.001, t+0.35);
+                osc.start(); osc.stop(t+0.35);
+            }
+        } catch(e) { /* audio blocked */ }
+    }
+
+    /* ---------- Expose for app.js / network.js ---------- */
     return {
-        initGame,
-        getTurn: () => game.turn(),
-        getClientColor: () => clientColor,
-        handleRemoteMove,
-        announceGameOver,
-        resetGameAndSwapColors,
-        fullRender // expose for theme switching
+        startGame,
+        applyRemoteMove,
+        getTurn:      () => chessEngine ? chessEngine.turn() : 'w',
+        getMyColor:   () => myColor,
+        isGameOver:   () => chessEngine ? chessEngine.game_over() : false,
+        resetAndSwap: () => {
+            const next = myColor === 'w' ? 'b' : 'w';
+            startGame(next);
+        }
     };
+
 })();
+
+/* ---------- Shared UI helpers (game context) ---------- */
+function showGameOver(emoji, title, detail) {
+    clearInterval(window.APP && APP.timerInterval);
+    document.getElementById('go-emoji').textContent  = emoji;
+    document.getElementById('go-title').textContent  = title;
+    document.getElementById('go-detail').textContent = detail;
+    document.getElementById('gameover-overlay').style.display = 'flex';
+    if (window.APP && APP.mode === 'online') {
+        document.getElementById('btn-rematch').style.display = '';
+    } else {
+        document.getElementById('btn-rematch').style.display = '';
+    }
+}
+
+function addChatMsg(who, text) {
+    const log = document.getElementById('chat-log');
+    const div = document.createElement('div');
+    div.className = 'chat-bubble ' + who;
+    div.textContent = text;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+}
