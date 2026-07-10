@@ -10,23 +10,23 @@ html { font-size: 16px; }
 /* ---------- THEME VARIABLES ---------- */
 :root,
 [data-theme="mono"] {
-    --bg:          #121212;   /* classic sleek dark background */
+    --bg:          #121212;   /* sleek slate-dark background */
     --bg2:         #1a1a1a;   /* header background */
     --card:        #242424;   /* sidebar / lobby cards */
     --card-border: #333333;
     --text:        #ffffff;
     --text2:       #999999;
-    --accent:      #52b8ff;   /* clean blue accent */
-    --accent2:     #3b82f6;
-    --danger:      #ef4444;
-    --sq-light:    #f0f2f5;   /* classic high-contrast off-white */
-    --sq-dark:     #3c3c3c;   /* classic dark charcoal */
-    --sq-sel:      rgba(82, 184, 255, 0.45);
-    --sq-last:     rgba(255, 255, 255, 0.20);
-    --sq-check:    rgba(239, 68, 68, 0.60);
+    --accent:      #81b64c;   /* vibrant chess.com green accent */
+    --accent2:     #6c9d3b;
+    --danger:      #e65c5c;
+    --sq-light:    #eeeed2;   /* classic cream-white */
+    --sq-dark:     #769656;   /* classic olive-green */
+    --sq-sel:      rgba(247, 247, 105, 0.55); /* classic yellow selection */
+    --sq-last:     rgba(247, 247, 105, 0.35); /* last move yellow tint */
+    --sq-check:    rgba(235, 97, 80, 0.65);
     --sq-hint:     rgba(0, 0, 0, 0.15);
     --board-border:#1a1a1a;
-    --clock-active:#52b8ff;
+    --clock-active:#81b64c;
 }
 [data-theme="wood"] {
     --bg:          #1a120a;
@@ -304,7 +304,7 @@ body {
 .sq.selected { background: var(--sq-sel) !important; }
 .sq.last-move { background: var(--sq-last) !important; }
 .sq.in-check { background: var(--sq-check) !important; }
-.sq.drag-hover { background: rgba(82, 184, 255, 0.50) !important; box-shadow: inset 0 0 0 3px var(--accent); }
+.sq.drag-hover { background: rgba(247, 247, 105, 0.40) !important; box-shadow: inset 0 0 0 3px var(--accent); }
 
 
 /* Piece SVG image */
