@@ -22,7 +22,7 @@ const ChessGame = (() => {
         const src = PIECE_CDN + key + '.svg';
         // Render as img; if src fails, swap to unicode text fallback
         return `<img class="piece-img" src="${src}" alt="${uni}"
-                     draggable="false"
+                     draggable="true"
                      onerror="this.outerHTML='<span class=\'piece-uni\'>${uni}</span>'">`;
     }
 
@@ -138,6 +138,74 @@ const ChessGame = (() => {
         boardEl.onclick = (e) => {
             const cell = e.target.closest('[data-sq]');
             if (cell) handleClick(cell.getAttribute('data-sq'));
+        };
+
+        // HTML5 Drag & Drop event bindings
+        boardEl.ondragstart = (e) => {
+            const cell = e.target.closest('[data-sq]');
+            if (!cell) return;
+            const fromSq = cell.getAttribute('data-sq');
+            if (!isMyTurn()) { e.preventDefault(); return; }
+
+            const piece = chessEngine.get(fromSq);
+            if (!piece || piece.color !== chessEngine.turn()) {
+                e.preventDefault();
+                return;
+            }
+
+            // Set dynamic drag data and local dragging states
+            selected = fromSq;
+            legalMoves = chessEngine.moves({ square: fromSq, verbose: true });
+            
+            e.dataTransfer.setData('text/plain', fromSq);
+            e.dataTransfer.effectAllowed = 'move';
+            
+            // Re-render board to display legal move dots / rings
+            render();
+        };
+
+        boardEl.ondragover = (e) => {
+            e.preventDefault(); // crucial to allow drop event
+        };
+
+        boardEl.ondragenter = (e) => {
+            const cell = e.target.closest('[data-sq]');
+            if (!cell) return;
+            const toSq = cell.getAttribute('data-sq');
+            // Visual feedback: only highlight legal squares
+            if (selected && legalMoves.some(m => m.to === toSq)) {
+                cell.classList.add('drag-hover');
+            }
+        };
+
+        boardEl.ondragleave = (e) => {
+            const cell = e.target.closest('[data-sq]');
+            if (cell) {
+                cell.classList.remove('drag-hover');
+            }
+        };
+
+        boardEl.ondrop = (e) => {
+            e.preventDefault();
+            const cell = e.target.closest('[data-sq]');
+            if (!cell) return;
+            const toSq = cell.getAttribute('data-sq');
+            const fromSq = e.dataTransfer.getData('text/plain');
+
+            // Reset drag hovered styling on all cells
+            document.querySelectorAll('.sq').forEach(el => el.classList.remove('drag-hover'));
+
+            if (fromSq && selected === fromSq && legalMoves.some(m => m.to === toSq)) {
+                attemptMove(fromSq, toSq);
+            } else {
+                selected = null;
+                legalMoves = [];
+                render();
+            }
+        };
+
+        boardEl.ondragend = (e) => {
+            document.querySelectorAll('.sq').forEach(el => el.classList.remove('drag-hover'));
         };
     }
 
