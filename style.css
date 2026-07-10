@@ -257,24 +257,23 @@ body {
 .player-strip.active .clock { color: var(--clock-active); }
 
 /* THE BOARD WRAPPER
-   Critical sizing rule:
-   - width: 100% of the board-col (1fr column)
-   - max-height: viewport minus header, padding, 2×player-strips, controls, gaps
-   - aspect-ratio: 1  →  browser picks the smaller dimension automatically
-   Result: a square that ALWAYS fits on screen with no scroll. */
+   ✅ Correct technique: width: min() picks the SMALLER of:
+      a) 100% of the board column (width-constrained)
+      b) viewport height minus all surrounding elements (height-constrained)
+   Then aspect-ratio: 1 makes height = width.
+   Result: a perfect square that NEVER overflows in ANY direction. */
 #board-wrap {
-    width: 100%;
-    max-height: calc(100vh - 52px - 1.2rem - 50px - 50px - 38px - 2rem);
-    /* breakdown: header(52) + padding(1.2rem≈19) + strip×2(50+50) + controls(38) + gaps(2rem≈32) */
+    /* Available height = viewport - header(52) - padding(~19px) - 2 strips(~100px) - controls(~40px) - gaps(~28px) */
+    --avail-h: calc(100vh - 52px - 1.2rem - 100px - 40px - 1.5rem);
+    width: min(100%, var(--avail-h));   /* ← the magic: constrained by both width AND height */
     aspect-ratio: 1 / 1;
     margin: 0 auto;
-    flex-shrink: 1;
-    min-height: 0;
+    flex-shrink: 0;
     position: relative;
     border: 5px solid var(--board-border);
     border-radius: 4px;
     overflow: hidden;
-    box-shadow: 0 10px 35px rgba(0,0,0,0.6);
+    box-shadow: 0 10px 35px rgba(0,0,0,0.55);
 }
 
 /* THE CHESS BOARD — pure CSS grid */
