@@ -197,18 +197,21 @@ document.addEventListener('DOMContentLoaded', () => {
 function setTheme(theme) {
     document.body.setAttribute('data-theme', theme);
     appState.theme = theme;
-    
+
     const monoBtn = document.getElementById('theme-mono-btn');
     const woodBtn = document.getElementById('theme-wood-btn');
-    
+
     if (theme === 'monochrome') {
         monoBtn.classList.add('active');
         woodBtn.classList.remove('active');
-        document.body.className = 'theme-monochrome';
     } else {
         monoBtn.classList.remove('active');
         woodBtn.classList.add('active');
-        document.body.className = 'theme-wood';
+    }
+
+    // Redraw board with new theme colors if game is active
+    if (appState.activeScreen === 'game' && typeof ChessGameController !== 'undefined') {
+        ChessGameController.fullRender();
     }
 }
 
