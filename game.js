@@ -324,9 +324,13 @@ const ChessGame = (() => {
         const isPromo = p && p.type === 'p' && (to[1] === '8' || to[1] === '1');
 
         if (isPromo && !promo) {
-            pendingPromo = { from, to };
-            showPromoDialog(p.color);
-            return;
+            if (!isMyTurn()) {
+                promo = 'q'; // Default to Queen for AI/opponent moves
+            } else {
+                pendingPromo = { from, to };
+                showPromoDialog(p.color);
+                return;
+            }
         }
 
         const moveObj = { from, to };
@@ -641,4 +645,9 @@ function addChatMsg(who, text) {
     div.textContent = text;
     log.appendChild(div);
     log.scrollTop = log.scrollHeight;
+
+    // Trigger visual notification badge on Chat tab if Moves tab is active
+    if (who === 'them' && typeof window.showChatBadge === 'function') {
+        window.showChatBadge();
+    }
 }

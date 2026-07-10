@@ -46,12 +46,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    document.getElementById('inp-mins').addEventListener('input', () => {
-        APP.preset.min = parseInt(document.getElementById('inp-mins').value) || 5;
-    });
-    document.getElementById('inp-inc').addEventListener('input', () => {
-        APP.preset.inc = parseInt(document.getElementById('inp-inc').value) || 0;
-    });
+    // Custom inputs sanitization and validation logic
+    const minsInp = document.getElementById('inp-mins');
+    const incInp  = document.getElementById('inp-inc');
+
+    function validateCustomInputs() {
+        let mins = parseInt(minsInp.value);
+        if (isNaN(mins) || mins < 1) mins = 1;
+        if (mins > 180) mins = 180;
+        minsInp.value = mins;
+        APP.preset.min = mins;
+
+        let inc = parseInt(incInp.value);
+        if (isNaN(inc) || inc < 0) inc = 0;
+        if (inc > 60) inc = 60;
+        incInp.value = inc;
+        APP.preset.inc = inc;
+    }
+
+    minsInp.addEventListener('input', validateCustomInputs);
+    minsInp.addEventListener('blur', validateCustomInputs);
+    incInp.addEventListener('input', validateCustomInputs);
+    incInp.addEventListener('blur', validateCustomInputs);
 
     // Host / Join / AI / Pass
     document.getElementById('btn-host').addEventListener('click', hostGame);
@@ -318,7 +334,33 @@ function switchTab(t) {
     document.getElementById('tab-chat').classList.toggle('active', !isMoves);
     document.getElementById('pane-moves').classList.toggle('active', isMoves);
     document.getElementById('pane-chat').classList.toggle('active', !isMoves);
+
+    // Hide badge once Chat tab is focused
+    if (!isMoves) {
+        document.getElementById('chat-badge').style.display = 'none';
+    }
 }
+
+// Global visual chat indicator trigger
+window.showChatBadge = function() {
+    const chatPane = document.getElementById('pane-chat');
+    if (!chatPane.classList.contains('active')) {
+        document.getElementById('chat-badge').style.display = 'inline-block';
+    }
+};
+
+/* ============================================================= */
+/*  ACCIDENTAL UNLOAD PREVENTION                                  */
+/* ============================================================= */
+window.addEventListener('beforeunload', (e) => {
+    // Only warn if the game screen is active and chess engine is not finished
+    const gameScreen = document.getElementById('game');
+    const isGameActive = gameScreen && gameScreen.classList.contains('active') && !ChessGame.isGameOver();
+    if (isGameActive) {
+        e.preventDefault();
+        e.returnValue = 'Are you sure you want to leave? Your active match progress will be lost.';
+    }
+});
 
 /* ============================================================= */
 /*  TOAST                                                         */
@@ -330,3 +372,4 @@ function toast(msg) {
     clearTimeout(el._t);
     el._t = setTimeout(() => el.classList.remove('show'), 2500);
 }
+
