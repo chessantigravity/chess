@@ -127,10 +127,6 @@ function setTheme(t) {
     document.documentElement.setAttribute('data-theme', t);
     document.getElementById('pill-mono').classList.toggle('active', t === 'mono');
     document.getElementById('pill-wood').classList.toggle('active', t === 'wood');
-    // Re-render board if game is active (colors come from CSS vars via classes)
-    if (document.getElementById('game').classList.contains('active')) {
-        ChessGame.startGame(ChessGame.getMyColor()); // cheapest re-render
-    }
 }
 
 /* ============================================================= */
