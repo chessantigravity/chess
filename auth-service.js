@@ -16,6 +16,7 @@ import {
 } from "./firebase-init.js";
 
 import { createUserProfile } from "./db-service.js";
+import { sendWelcomeEmail } from "./email-service.js";
 
 // Session guest mode flag
 let isGuestModeActive = false;
@@ -46,6 +47,9 @@ export const AuthService = {
             username: username.trim(),
             email: email.trim().toLowerCase()
         });
+
+        // Trigger welcome email asynchronously (fails gracefully internally)
+        sendWelcomeEmail(email.trim().toLowerCase(), username.trim());
         
         return user;
     },
