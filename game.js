@@ -913,6 +913,34 @@ function showGameOver(emoji, title, detail) {
     } else {
         document.getElementById('btn-rematch').style.display = '';
     }
+
+    // Save game stats in AI practice matches if authenticated
+    if (window.APP && APP.mode === 'ai') {
+        import('./auth-service.js').then(({ AuthService }) => {
+            const user = AuthService.getCurrentUser();
+            if (user && !AuthService.isGuest()) {
+                let outcome = 'draw';
+                if (title.includes('Checkmate')) {
+                    const winner = detail.includes('White wins') ? 'w' : 'b';
+                    outcome = (winner === myColor) ? 'win' : 'loss';
+                } else if (title.includes('wins') && detail.includes('resigned')) {
+                    const winner = title.includes('White wins') ? 'w' : 'b';
+                    outcome = (winner === myColor) ? 'win' : 'loss';
+                }
+                
+                let aiLevel = 'AI';
+                if (APP.aiLevel) {
+                    aiLevel = 'AI (' + APP.aiLevel.charAt(0).toUpperCase() + APP.aiLevel.slice(1) + ')';
+                }
+
+                import('./db-service.js').then(({ DbService }) => {
+                    DbService.recordGameResult(user.uid, outcome, aiLevel).then(() => {
+                        if (window.authUIUpdate) window.authUIUpdate(user, false);
+                    });
+                });
+            }
+        });
+    }
 }
 
 function addChatMsg(who, text) {

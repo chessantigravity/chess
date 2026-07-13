@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. User Profiles
+    match /users/{userId} {
+      allow read: if request.auth != null; // Registered users can view profiles (required for leaderboards/matches)
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // 2. User Settings
+    match /settings/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // 3. User Achievements
+    match /achievements/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // 4. User Progress (Puzzles & Lessons)
+    match /userProgress/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // 5. Matches (Future Online Matchmaking docs)
+    match /matches/{matchId} {
+      allow read: if request.auth != null;
+      // Allow write if the user is one of the participants in the match
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && 
+        (resource.data.whiteId == request.auth.uid || resource.data.blackId == request.auth.uid);
+    }
+    
+    // 6. Puzzles Database (Read-only for all users)
+    match /puzzles/{puzzleId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only admin/backend can add/edit puzzles
+    }
+    
+    // 7. Lessons / Learn content (Read-only for all users)
+    match /learning/{lessonId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only admin/backend can write lessons
+    }
+  }
+}

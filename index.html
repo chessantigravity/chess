@@ -11,6 +11,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <link rel="stylesheet" href="style.css">
+    <script type="importmap">
+      {
+        "imports": {
+          "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+          "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
+          "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
+        }
+      }
+    </script>
 </head>
 <body>
 
@@ -39,6 +48,11 @@
     <div class="lobby-hero">
         <h1>Play Chess Online</h1>
         <p>Peer-to-peer multiplayer · No account · No install</p>
+    </div>
+
+    <!-- USER PROFILE DASHBOARD -->
+    <div class="profile-dashboard-card" id="profile-dashboard">
+        <!-- Rendered dynamically by auth-ui.js -->
     </div>
 
     <div class="lobby-cards">
@@ -269,8 +283,133 @@
 <!-- TOAST -->
 <div id="toast">Copied!</div>
 
+<!-- ============ AUTHENTICATION SCREEN ============ -->
+<div id="auth-screen">
+    
+    <!-- 1. LOGIN PANEL -->
+    <div class="auth-card" id="panel-login">
+        <div class="auth-logo">♞</div>
+        <h2 class="auth-title">Antigravity Chess</h2>
+        <p class="auth-subtitle">Log in to track rating, play online, and save progress.</p>
+        
+        <form id="form-login">
+            <div class="auth-field">
+                <label class="auth-label" for="login-email">Email Address</label>
+                <div class="auth-input-wrap">
+                    <i class="fa fa-envelope"></i>
+                    <input class="inp" id="login-email" type="email" placeholder="name@domain.com" required>
+                </div>
+            </div>
+            
+            <div class="auth-field">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <label class="auth-label" for="login-pass">Password</label>
+                    <a href="#" class="auth-link" id="link-forgot-pw" style="font-size:0.75rem; margin-bottom: 0.45rem;">Forgot Password?</a>
+                </div>
+                <div class="auth-input-wrap">
+                    <i class="fa fa-lock"></i>
+                    <input class="inp" id="login-pass" type="password" placeholder="••••••••" required>
+                </div>
+            </div>
+            
+            <div class="auth-row">
+                <label class="auth-checkbox-label">
+                    <input type="checkbox" id="login-remember" checked> Remember Me
+                </label>
+            </div>
+            
+            <button class="btn btn-primary" type="submit" style="width:100%;">
+                <i class="fa fa-sign-in-alt"></i> Sign In
+            </button>
+            
+            <div class="auth-msg" id="login-msg"></div>
+            
+            <div class="auth-divider">Or</div>
+            
+            <button class="btn btn-secondary" id="btn-guest-play" type="button" style="width:100%; margin-bottom:1.5rem;">
+                <i class="fa fa-user-secret"></i> Play as Guest (Quick Play)
+            </button>
+            
+            <p style="font-size:0.85rem; color:var(--text2); margin:0;">
+                Don't have an account? <a href="#" class="auth-link" id="link-to-signup">Sign Up</a>
+            </p>
+        </form>
+    </div>
+
+    <!-- 2. SIGN UP PANEL -->
+    <div class="auth-card" id="panel-signup" style="display:none;">
+        <div class="auth-logo">♞</div>
+        <h2 class="auth-title">Create Account</h2>
+        <p class="auth-subtitle">Join the premium chess community for free.</p>
+        
+        <form id="form-signup">
+            <div class="auth-field">
+                <label class="auth-label" for="signup-user">Username</label>
+                <div class="auth-input-wrap">
+                    <i class="fa fa-user"></i>
+                    <input class="inp" id="signup-user" type="text" placeholder="chess_master" required>
+                </div>
+            </div>
+            
+            <div class="auth-field">
+                <label class="auth-label" for="signup-email">Email Address</label>
+                <div class="auth-input-wrap">
+                    <i class="fa fa-envelope"></i>
+                    <input class="inp" id="signup-email" type="email" placeholder="name@domain.com" required>
+                </div>
+            </div>
+            
+            <div class="auth-field">
+                <label class="auth-label" for="signup-pass">Password</label>
+                <div class="auth-input-wrap">
+                    <i class="fa fa-lock"></i>
+                    <input class="inp" id="signup-pass" type="password" placeholder="Min. 6 characters" required>
+                </div>
+            </div>
+            
+            <button class="btn btn-primary" type="submit" style="width:100%; margin-top:0.5rem;">
+                <i class="fa fa-user-plus"></i> Register
+            </button>
+            
+            <div class="auth-msg" id="signup-msg"></div>
+            
+            <p style="font-size:0.85rem; color:var(--text2); margin-top:1.5rem; margin-bottom:0;">
+                Already have an account? <a href="#" class="auth-link" id="link-to-login">Log In</a>
+            </p>
+        </form>
+    </div>
+
+    <!-- 3. FORGOT PASSWORD PANEL -->
+    <div class="auth-card" id="panel-forgot" style="display:none;">
+        <div class="auth-logo">🔑</div>
+        <h2 class="auth-title">Reset Password</h2>
+        <p class="auth-subtitle">Enter your email and we'll send a password recovery link.</p>
+        
+        <form id="form-forgot">
+            <div class="auth-field">
+                <label class="auth-label" for="forgot-email">Email Address</label>
+                <div class="auth-input-wrap">
+                    <i class="fa fa-envelope"></i>
+                    <input class="inp" id="forgot-email" type="email" placeholder="name@domain.com" required>
+                </div>
+            </div>
+            
+            <button class="btn btn-primary" type="submit" style="width:100%; margin-top:0.5rem;">
+                <i class="fa fa-paper-plane"></i> Send Recovery Link
+            </button>
+            
+            <div class="auth-msg" id="forgot-msg"></div>
+            
+            <p style="font-size:0.85rem; color:var(--text2); margin-top:1.5rem; margin-bottom:0;">
+                <a href="#" class="auth-link" id="link-to-login-from-forgot">Back to Login</a>
+            </p>
+        </form>
+    </div>
+</div>
+
 <script src="network.js"></script>
 <script src="game.js"></script>
 <script src="app.js"></script>
+<script type="module" src="auth-ui.js"></script>
 </body>
 </html>
