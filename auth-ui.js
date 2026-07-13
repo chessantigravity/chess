@@ -278,167 +278,159 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- PROFILE DASHBOARD RENDERING ---
 
+    // ─── Slim lobby profile bar (avatar + name only) ───────────────────────
     async function renderUserProfile(uid) {
-        const dashboard = document.getElementById("profile-dashboard");
-        if (!dashboard) return;
-        
-        dashboard.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 1.5rem;"><i class="fa fa-spinner fa-spin"></i> Loading profile…</div>';
+        const bar = document.getElementById("lobby-profile-bar");
+        if (!bar) return;
+
+        bar.style.display = "block";
+        bar.innerHTML = `<div class="lobby-profile-strip"><i class="fa fa-spinner fa-spin" style="color:var(--text2);"></i></div>`;
 
         try {
             const profile = await DbService.getUserProfile(uid);
-            if (!profile) {
-                dashboard.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 1.5rem; color: var(--text2);">Failed to load profile. Please log out and try again.</div>';
-                return;
-            }
+            if (!profile) { bar.innerHTML = ''; return; }
 
-            const winRate = profile.winPercentage || 0;
-            const achievementsCount = (profile.achievements || []).length;
-            const joinFormatted = new Date(profile.joinDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-
-            dashboard.innerHTML = `
-                <!-- Left: Profile identity card -->
-                <div class="profile-card-left">
-                    <div style="display:flex; gap:1.25rem; align-items:center;">
-                        <div class="profile-avatar">${profile.avatar || "👤"}</div>
-                        <div>
-                            <div class="profile-username">${profile.username}</div>
-                            <div class="profile-email">${profile.email}</div>
-                            <div class="profile-joined">Joined: ${joinFormatted}</div>
-                        </div>
+            bar.innerHTML = `
+                <div class="lobby-profile-strip" id="lobby-strip-clickable" title="View Profile" style="cursor:pointer;">
+                    <div class="lobby-strip-avatar">${profile.avatar || '👤'}</div>
+                    <div class="lobby-strip-info">
+                        <span class="lobby-strip-name">${profile.username}</span>
+                        <span class="lobby-strip-sub">${profile.gamesPlayed || 0} games &bull; ${profile.winPercentage || 0}% win rate</span>
                     </div>
-                    <div style="display:flex; gap:0.5rem; margin-top: 1rem;">
-                        <button class="btn btn-secondary btn-sm" id="btn-edit-profile" style="padding: 0.45rem 0.9rem;">
-                            <i class="fa fa-edit"></i> Edit
+                    <div class="lobby-strip-actions">
+                        <button class="btn btn-primary btn-sm" id="btn-view-profile" style="padding:0.4rem 1rem; font-size:0.82rem;">
+                            <i class="fa fa-user"></i> View Profile
                         </button>
-                        <button class="btn btn-secondary btn-sm" id="btn-logout" style="padding: 0.45rem 0.9rem;">
-                            <i class="fa fa-sign-out-alt"></i> Sign Out
+                        <button class="btn btn-secondary btn-sm" id="btn-lobby-logout" style="padding:0.4rem 0.8rem; font-size:0.82rem;">
+                            <i class="fa fa-sign-out-alt"></i>
                         </button>
-                    </div>
-                </div>
-                <!-- Right: Stats Panel Grid -->
-                <div class="profile-card-right">
-                    <div class="profile-stat-box">
-                        <span class="profile-stat-val">${profile.gamesPlayed || 0}</span>
-                        <span class="profile-stat-lbl">Played</span>
-                    </div>
-                    <div class="profile-stat-box">
-                        <span class="profile-stat-val" style="color: #22c55e;">${profile.wins || 0}</span>
-                        <span class="profile-stat-lbl">Wins</span>
-                    </div>
-                    <div class="profile-stat-box">
-                        <span class="profile-stat-val" style="color: #ef4444;">${profile.losses || 0}</span>
-                        <span class="profile-stat-lbl">Losses</span>
-                    </div>
-                    <div class="profile-stat-box">
-                        <span class="profile-stat-val" style="color: #94a3b8;">${profile.draws || 0}</span>
-                        <span class="profile-stat-lbl">Draws</span>
-                    </div>
-                    <div class="profile-stat-box">
-                        <span class="profile-stat-val">${winRate}%</span>
-                        <span class="profile-stat-lbl">Win Rate</span>
-                    </div>
-                    <div class="profile-stat-box">
-                        <span class="profile-stat-val" style="font-size: 0.85rem; padding-top: 0.25rem;">${profile.highestAIDefeated || "None"}</span>
-                        <span class="profile-stat-lbl">Best AI</span>
-                    </div>
-                    <div class="profile-stat-box">
-                        <span class="profile-stat-val" style="font-size: 0.85rem; padding-top: 0.25rem;">${profile.favoriteOpening || "None"}</span>
-                        <span class="profile-stat-lbl">Opening</span>
-                    </div>
-                    <div class="profile-stat-box">
-                        <span class="profile-stat-val"><i class="fa fa-star" style="color:#fbbf24; font-size:0.9em;"></i> ${Object.values(profile.puzzleStars || {}).reduce((a,b)=>a+b,0)}</span>
-                        <span class="profile-stat-lbl">Puzzle ★</span>
-                    </div>
-                    <div class="profile-stat-box">
-                        <span class="profile-stat-val">${profile.learningProgress || 0}</span>
-                        <span class="profile-stat-lbl">Lessons</span>
-                    </div>
-                    <div class="profile-stat-box">
-                        <span class="profile-stat-val">${achievementsCount}/5</span>
-                        <span class="profile-stat-lbl">Trophies</span>
                     </div>
                 </div>
             `;
 
-            // Bind sign out click
-            document.getElementById("btn-logout").onclick = async () => {
-                await AuthService.logout();
-            };
+            document.getElementById('btn-view-profile').onclick = () => openProfilePage(uid);
+            document.getElementById('btn-lobby-logout').onclick = async () => { await AuthService.logout(); };
 
-            // Bind edit profile click
-            document.getElementById("btn-edit-profile").onclick = () => {
-                const editModal = document.getElementById("profile-edit-overlay");
-                const usernameInput = document.getElementById("edit-username");
-                const msg = document.getElementById("edit-profile-msg");
-                
-                // Reset message
-                msg.textContent = "";
-                msg.className = "auth-msg";
-                
-                // Pre-fill username
-                usernameInput.value = profile.username;
-                
-                // Pre-select avatar symbol in picker grid
-                const currentAvatar = profile.avatar || "👤";
-                document.querySelectorAll(".picker-avatar").forEach(el => {
-                    if (el.getAttribute("data-char") === currentAvatar) {
-                        el.classList.add("selected");
-                    } else {
-                        el.classList.remove("selected");
-                    }
-                });
-                
-                editModal.style.display = "flex";
-            };
-
-        } catch (e) {
-            console.error("Failed to render profile dashboard:", e);
-            dashboard.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 1.5rem; color: var(--text2);">Failed to load profile.</div>';
+        } catch(e) {
+            console.error('Failed to render lobby strip:', e);
+            bar.innerHTML = '';
         }
     }
 
-    function renderGuestProfile() {
-        const dashboard = document.getElementById("profile-dashboard");
-        if (!dashboard) return;
+    // ─── Full Profile Page ──────────────────────────────────────────────────
+    async function openProfilePage(uid) {
+        document.getElementById('lobby').style.display = 'none';
+        const screen = document.getElementById('profile-screen');
+        screen.style.display = 'block';
 
-        dashboard.innerHTML = `
-            <!-- Left: Profile identity card -->
-            <div class="profile-card-left" style="border-right-color: transparent;">
-                <div style="display:flex; gap:1.25rem; align-items:center;">
-                    <div class="profile-avatar" style="background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: var(--text2);">👥</div>
-                    <div>
-                        <div class="profile-username">Guest Player</div>
-                        <div class="profile-email">Offline Guest Mode</div>
-                        <div class="profile-joined" style="color: var(--accent); font-weight: 500;">Create an account to track ratings and unlock achievements!</div>
-                    </div>
+        // Show loading state
+        document.getElementById('ppage-username').textContent = 'Loading…';
+        document.getElementById('ppage-email').textContent = '';
+        document.getElementById('ppage-joined').textContent = '';
+        document.getElementById('ppage-avatar').textContent = '👤';
+        document.getElementById('ppage-stats-grid').innerHTML = `<div style="color:var(--text2); font-size:0.85rem;"><i class="fa fa-spinner fa-spin"></i> Loading stats…</div>`;
+
+        try {
+            const profile = await DbService.getUserProfile(uid);
+            if (!profile) return;
+
+            const joinFormatted = new Date(profile.joinDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+            const winRate = profile.winPercentage || 0;
+            const achievementsCount = (profile.achievements || []).length;
+            const totalStars = Object.values(profile.puzzleStars || {}).reduce((a,b)=>a+b,0);
+            const puzzleLevel = profile.puzzleProgress || 1;
+            const lessons = profile.learningProgress || 0;
+
+            // Hero card
+            document.getElementById('ppage-avatar').textContent   = profile.avatar || '👤';
+            document.getElementById('ppage-username').textContent  = profile.username;
+            document.getElementById('ppage-email').textContent     = profile.email;
+            document.getElementById('ppage-joined').textContent    = `Joined ${joinFormatted}`;
+
+            // Stats grid
+            const stats = [
+                { val: profile.gamesPlayed || 0,            lbl: 'Played',      color: '' },
+                { val: profile.wins || 0,                   lbl: 'Wins',        color: '#22c55e' },
+                { val: profile.losses || 0,                 lbl: 'Losses',      color: '#ef4444' },
+                { val: profile.draws || 0,                  lbl: 'Draws',       color: '#94a3b8' },
+                { val: winRate + '%',                       lbl: 'Win Rate',    color: '#3b82f6' },
+                { val: profile.highestAIDefeated || 'None', lbl: 'Best AI',     color: '#f59e0b', small: true },
+                { val: profile.favoriteOpening || 'None',   lbl: 'Opening',     color: '',        small: true },
+                { val: '⭐ ' + totalStars,                  lbl: 'Puzzle ★',   color: '#fbbf24' },
+                { val: lessons,                             lbl: 'Lessons',     color: '' },
+                { val: achievementsCount + '/5',            lbl: 'Trophies',    color: '' },
+            ];
+
+            document.getElementById('ppage-stats-grid').innerHTML = stats.map(s => `
+                <div class="profile-stat-box">
+                    <span class="profile-stat-val" style="${s.color ? 'color:'+s.color+';' : ''}${s.small ? 'font-size:0.85rem;' : ''}">${s.val}</span>
+                    <span class="profile-stat-lbl">${s.lbl}</span>
                 </div>
-                <div style="display:flex; gap:0.75rem; margin-top: 1.25rem;">
-                    <button class="btn btn-primary btn-sm" id="btn-guest-signup" style="padding: 0.45rem 1rem;">
-                        <i class="fa fa-user-plus"></i> Create Account
-                    </button>
-                    <button class="btn btn-secondary btn-sm" id="btn-guest-signin" style="padding: 0.45rem 1rem;">
-                        <i class="fa fa-sign-in-alt"></i> Sign In
-                    </button>
+            `).join('');
+
+            // Progress bars (animate after small delay)
+            setTimeout(() => {
+                const puzzlePct = Math.min(100, ((puzzleLevel - 1) / 506) * 100).toFixed(1);
+                const lessonsPct = Math.min(100, (lessons / 14) * 100).toFixed(1);
+                document.getElementById('ppage-puzzle-label').textContent  = `${puzzleLevel - 1} / 506`;
+                document.getElementById('ppage-lessons-label').textContent = `${lessons} / 14`;
+                document.getElementById('ppage-winrate-label').textContent = `${winRate}%`;
+                document.getElementById('ppage-puzzle-bar').style.width   = puzzlePct + '%';
+                document.getElementById('ppage-lessons-bar').style.width  = lessonsPct + '%';
+                document.getElementById('ppage-winrate-bar').style.width  = winRate + '%';
+            }, 80);
+
+            // Bind profile page buttons
+            document.getElementById('btn-profile-back').onclick = () => {
+                screen.style.display = 'none';
+                document.getElementById('lobby').style.display = 'block';
+            };
+            document.getElementById('btn-profile-logout').onclick = async () => {
+                await AuthService.logout();
+            };
+            document.getElementById('btn-profile-edit').onclick = () => {
+                const editModal = document.getElementById('profile-edit-overlay');
+                const usernameInput = document.getElementById('edit-username');
+                const msg = document.getElementById('edit-profile-msg');
+                msg.textContent = '';
+                msg.className = 'auth-msg';
+                usernameInput.value = profile.username;
+                const currentAvatar = profile.avatar || '👤';
+                document.querySelectorAll('.picker-avatar').forEach(el => {
+                    el.classList.toggle('selected', el.getAttribute('data-char') === currentAvatar);
+                });
+                editModal.style.display = 'flex';
+            };
+
+        } catch(e) {
+            console.error('Failed to render profile page:', e);
+        }
+    }
+
+    // ─── Guest Lobby Strip ──────────────────────────────────────────────────
+    function renderGuestProfile() {
+        const bar = document.getElementById('lobby-profile-bar');
+        if (!bar) return;
+        bar.style.display = 'block';
+        bar.innerHTML = `
+            <div class="lobby-profile-strip">
+                <div class="lobby-strip-avatar" style="background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.1); font-size:1.6rem;">👥</div>
+                <div class="lobby-strip-info">
+                    <span class="lobby-strip-name">Guest Player</span>
+                    <span class="lobby-strip-sub" style="color:var(--accent);">Create a free account to save your progress!</span>
                 </div>
-            </div>
-            <!-- Right: Explanatory benefits panel -->
-            <div class="profile-card-right" style="grid-template-columns: 1fr; display: flex; align-items: center; justify-content: center; text-align: center; padding: 1rem; color: var(--text2); font-size: 0.8rem; line-height: 1.5;">
-                <div>
-                    <div style="font-weight: 800; color: var(--text); font-size: 0.9rem; margin-bottom: 0.25rem;">♟ Unlock Full Platform Experience</div>
-                    With a free account, you can save your game statistics, track puzzle history, earn trophies, and access cloud synchronization!
+                <div class="lobby-strip-actions">
+                    <button class="btn btn-primary btn-sm" id="btn-guest-signup" style="padding:0.4rem 1rem; font-size:0.82rem;">
+                        <i class="fa fa-user-plus"></i> Sign Up
+                    </button>
+                    <button class="btn btn-secondary btn-sm" id="btn-guest-signin" style="padding:0.4rem 0.9rem; font-size:0.82rem;">
+                        <i class="fa fa-sign-in-alt"></i> Log In
+                    </button>
                 </div>
             </div>
         `;
-
-        // Bind redirect controls
-        document.getElementById("btn-guest-signup").onclick = () => {
-            showAuthScreenView();
-            showPanel(panelSignup);
-        };
-        document.getElementById("btn-guest-signin").onclick = () => {
-            showAuthScreenView();
-            showPanel(panelLogin);
-        };
+        document.getElementById('btn-guest-signup').onclick = () => { showAuthScreenView(); showPanel(panelSignup); };
+        document.getElementById('btn-guest-signin').onclick = () => { showAuthScreenView(); showPanel(panelLogin); };
     }
 
     // --- MATCH HISTORY RENDERING ---
