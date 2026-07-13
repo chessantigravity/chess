@@ -5,6 +5,7 @@
 
 import { AuthService } from "./auth-service.js";
 import { DbService } from "./db-service.js";
+import { openReplayModal } from "./replay-modal.js";
 
 // Global update handler for external bindings
 window.authUIUpdate = null;
@@ -193,14 +194,20 @@ document.addEventListener("DOMContentLoaded", () => {
             showMainScreen();
             await DbService.recordLogin(user.uid);
             renderUserProfile(user.uid);
+            
+            // Show match history
+            document.getElementById("match-history-card").style.display = "block";
+            fetchAndRenderMatches(user.uid);
         } else if (isGuest) {
             // Guest mode active
             showMainScreen();
             renderGuestProfile();
+            document.getElementById("match-history-card").style.display = "none";
         } else {
             // Unauthenticated
             showAuthScreenView();
             showPanel(panelLogin);
+            document.getElementById("match-history-card").style.display = "none";
         }
     });
 
@@ -209,12 +216,16 @@ document.addEventListener("DOMContentLoaded", () => {
         if (user) {
             showMainScreen();
             renderUserProfile(user.uid);
+            document.getElementById("match-history-card").style.display = "block";
+            fetchAndRenderMatches(user.uid);
         } else if (isGuest) {
             showMainScreen();
             renderGuestProfile();
+            document.getElementById("match-history-card").style.display = "none";
         } else {
             showAuthScreenView();
             showPanel(panelLogin);
+            document.getElementById("match-history-card").style.display = "none";
         }
     };
 
@@ -428,6 +439,125 @@ document.addEventListener("DOMContentLoaded", () => {
             showAuthScreenView();
             showPanel(panelLogin);
         };
+    }
+
+    // --- MATCH HISTORY RENDERING ---
+    let userMatches = [];
+
+    // Bind Match History filters
+    document.getElementById("mh-search").addEventListener("input", renderMatchesList);
+    document.getElementById("mh-filter-result").addEventListener("change", renderMatchesList);
+    document.getElementById("mh-filter-type").addEventListener("change", renderMatchesList);
+    document.getElementById("mh-sort").addEventListener("change", renderMatchesList);
+
+    async function fetchAndRenderMatches(uid) {
+        const listContainer = document.getElementById("mh-list");
+        if (!listContainer) return;
+        
+        listContainer.innerHTML = '<div style="text-align:center; padding:1rem; color:var(--text2);"><i class="fa fa-spinner fa-spin"></i> Loading matches…</div>';
+        
+        try {
+            userMatches = await DbService.getUserMatches(uid);
+            renderMatchesList();
+        } catch (e) {
+            console.error("Failed to load match history:", e);
+            listContainer.textContent = "Failed to load match history.";
+        }
+    }
+
+    function renderMatchesList() {
+        const listContainer = document.getElementById("mh-list");
+        if (!listContainer) return;
+
+        const searchQuery = document.getElementById("mh-search").value.trim().toLowerCase();
+        const filterResult = document.getElementById("mh-filter-result").value;
+        const filterType = document.getElementById("mh-filter-type").value;
+        const sortBy = document.getElementById("mh-sort").value;
+
+        // 1. Filter matches
+        let processed = userMatches.filter(m => {
+            const matchesSearch = !searchQuery || m.opponent.toLowerCase().includes(searchQuery);
+            const matchesResult = filterResult === "all" || m.result === filterResult;
+            const matchesType = filterType === "all" || m.opponentType === filterType;
+            return matchesSearch && matchesResult && matchesType;
+        });
+
+        // 2. Sort matches
+        processed.sort((a, b) => {
+            if (sortBy === "date-desc") return new Date(b.date) - new Date(a.date);
+            if (sortBy === "date-asc") return new Date(a.date) - new Date(b.date);
+            if (sortBy === "moves-desc") return b.movesCount - a.movesCount;
+            if (sortBy === "duration-desc") return b.duration - a.duration;
+            return 0;
+        });
+
+        // 3. Render list items
+        if (processed.length === 0) {
+            listContainer.innerHTML = '<div style="text-align:center; padding:1.5rem; color:var(--text2); font-size:0.85rem;">No matching matches found.</div>';
+            return;
+        }
+
+        listContainer.innerHTML = "";
+        processed.forEach(m => {
+            const dateStr = new Date(m.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+            
+            // Format duration
+            const min = Math.floor(m.duration / 60);
+            const sec = m.duration % 60;
+            const durationStr = min > 0 ? `${min}m ${sec}s` : `${sec}s`;
+
+            const resultClass = m.result === "win" ? "easy" : m.result === "loss" ? "master" : "medium";
+            const resultLabel = m.result.toUpperCase();
+
+            const itemDiv = document.createElement("div");
+            itemDiv.className = "card";
+            itemDiv.style.display = "flex";
+            itemDiv.style.justifyContent = "space-between";
+            itemDiv.style.alignItems = "center";
+            itemDiv.style.padding = "0.75rem 1rem";
+            itemDiv.style.background = "var(--bg)";
+            itemDiv.style.border = "1px solid var(--card-border)";
+            itemDiv.style.borderRadius = "10px";
+            itemDiv.style.flexWrap = "wrap";
+            itemDiv.style.gap = "0.75rem";
+            itemDiv.style.margin = "0";
+
+            const leftCol = document.createElement("div");
+            leftCol.style.display = "flex";
+            leftCol.style.alignItems = "center";
+            leftCol.style.gap = "0.75rem";
+            leftCol.style.textAlign = "left";
+            
+            const badge = document.createElement("span");
+            badge.className = `ai-badge ${resultClass}`;
+            badge.style.fontSize = "0.65rem";
+            badge.style.width = "42px";
+            badge.style.textAlign = "center";
+            badge.textContent = resultLabel;
+            
+            const details = document.createElement("div");
+            details.innerHTML = `
+                <div style="font-weight: 800; font-size: 0.9rem;">vs ${m.opponent} <span style="font-size:0.75rem; color:var(--text2); font-weight:normal;">(${m.opponentType})</span></div>
+                <div style="font-size: 0.75rem; color: var(--text2); margin-top:0.15rem;">
+                    ${dateStr} &bull; ${m.movesCount} moves &bull; ${durationStr} &bull; <span style="color:var(--text); font-weight:500;">${m.openingName || "Unknown Opening"}</span>
+                </div>
+            `;
+            
+            leftCol.appendChild(badge);
+            leftCol.appendChild(details);
+
+            const replayBtn = document.createElement("button");
+            replayBtn.className = "btn btn-secondary btn-sm";
+            replayBtn.style.padding = "0.4rem 0.8rem";
+            replayBtn.innerHTML = '<i class="fa fa-play-circle"></i> Replay';
+            replayBtn.onclick = () => {
+                openReplayModal(m);
+            };
+
+            itemDiv.appendChild(leftCol);
+            itemDiv.appendChild(replayBtn);
+            listContainer.appendChild(itemDiv);
+        });
     }
 });
 export { AuthService };

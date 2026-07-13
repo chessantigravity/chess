@@ -40,6 +40,7 @@ const ChessGame = (() => {
     let dragOffsetX = 0;     // horizontal offset of pointer from piece center
     let dragOffsetY = 0;     // vertical offset of pointer from piece center
     let aiThinkTimeout = null; // scheduled AI move execution timer
+    let matchStartTime = null; // track game start time for match duration calculation
 
     /* ---------- Coordinate helpers ---------- */
     const files = 'abcdefgh';
@@ -71,6 +72,7 @@ const ChessGame = (() => {
         flipped  = (color === 'b');
         selected = null;
         legalMoves = [];
+        matchStartTime = Date.now();
 
         document.getElementById('btn-flip').onclick = () => { flipped = !flipped; render(); };
 
@@ -914,8 +916,8 @@ function showGameOver(emoji, title, detail) {
         document.getElementById('btn-rematch').style.display = '';
     }
 
-    // Save game stats in AI practice matches if authenticated
-    if (window.APP && APP.mode === 'ai') {
+    // Save game stats in AI practice / P2P matches if authenticated
+    if (window.APP && (APP.mode === 'ai' || APP.mode === 'online')) {
         import('./auth-service.js').then(({ AuthService }) => {
             const user = AuthService.getCurrentUser();
             if (user && !AuthService.isGuest()) {
@@ -926,16 +928,31 @@ function showGameOver(emoji, title, detail) {
                 } else if (title.includes('wins') && detail.includes('resigned')) {
                     const winner = title.includes('White wins') ? 'w' : 'b';
                     outcome = (winner === myColor) ? 'win' : 'loss';
+                } else if (title.includes('Resigned') || detail.includes('resigned')) {
+                    const winner = title.includes('White wins') || detail.includes('White resigned') ? 'w' : 'b';
+                    outcome = (winner === myColor) ? 'win' : 'loss';
                 }
                 
-                let aiLevel = 'AI';
-                if (APP.aiLevel) {
-                    aiLevel = 'AI (' + APP.aiLevel.charAt(0).toUpperCase() + APP.aiLevel.slice(1) + ')';
-                }
-
+                const opponentName = document.getElementById('nm-opp')?.textContent || 'Opponent';
+                const duration = matchStartTime ? Math.round((Date.now() - matchStartTime) / 1000) : 0;
+                
                 import('./db-service.js').then(({ DbService }) => {
-                    DbService.recordGameResult(user.uid, outcome, aiLevel).then(() => {
-                        if (window.authUIUpdate) window.authUIUpdate(user, false);
+                    // 1. Record profile summary updates (wins/losses/draws ELO)
+                    DbService.recordGameResult(user.uid, outcome, opponentName).then(() => {
+                        // 2. Record detailed match history record
+                        DbService.recordMatch(user.uid, {
+                            opponent: opponentName,
+                            opponentType: (APP.mode === 'ai') ? 'AI' : 'Human',
+                            aiDifficulty: (APP.mode === 'ai') ? APP.aiLevel : null,
+                            duration: duration,
+                            result: outcome,
+                            movesCount: chessEngine.history().length,
+                            pgn: chessEngine.pgn(),
+                            history: chessEngine.history(),
+                            myColor: myColor
+                        }).then(() => {
+                            if (window.authUIUpdate) window.authUIUpdate(user, false);
+                        });
                     });
                 });
             }

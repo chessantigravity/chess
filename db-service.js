@@ -8,7 +8,12 @@ import {
     doc, 
     getDoc, 
     setDoc, 
-    updateDoc 
+    updateDoc,
+    collection,
+    query,
+    where,
+    orderBy,
+    getDocs
 } from "./firebase-init.js";
 
 export const DbService = {
@@ -174,6 +179,100 @@ export const DbService = {
         if (changed) {
             await this.updateUserProfile(uid, { achievements: newAchievements });
         }
+    },
+
+    // Record a completed match
+    async recordMatch(uid, match) {
+        if (!uid) return;
+        const matchId = "match_" + Math.random().toString(36).substr(2, 9);
+        const docRef = doc(db, "matches", matchId);
+        
+        const record = {
+            matchId,
+            userId: uid,
+            opponent: match.opponent || "Guest",
+            opponentType: match.opponentType || "Human",
+            aiDifficulty: match.aiDifficulty || null,
+            date: new Date().toISOString(),
+            duration: match.duration || 0,
+            result: match.result || "draw",
+            movesCount: match.movesCount || 0,
+            pgn: match.pgn || "",
+            openingName: this.detectOpening(match.history || []),
+            myColor: match.myColor || "w"
+        };
+        
+        if (window.FIREBASE_MOCKED) {
+            const matches = JSON.parse(localStorage.getItem("mock_matches") || "[]");
+            matches.push(record);
+            localStorage.setItem("mock_matches", JSON.stringify(matches));
+        } else {
+            await setDoc(docRef, record);
+        }
+        return record;
+    },
+
+    // Fetch user matches history
+    async getUserMatches(uid) {
+        if (!uid) return [];
+        if (window.FIREBASE_MOCKED) {
+            const matches = JSON.parse(localStorage.getItem("mock_matches") || "[]");
+            return matches
+                .filter(m => m.userId === uid)
+                .sort((a, b) => new Date(b.date) - new Date(a.date));
+        } else {
+            try {
+                const matchesCol = collection(db, "matches");
+                const q = query(matchesCol, where("userId", "==", uid), orderBy("date", "desc"));
+                const snapshot = await getDocs(q);
+                const list = [];
+                snapshot.forEach(doc => {
+                    list.push(doc.data());
+                });
+                return list;
+            } catch (err) {
+                console.error("Failed to fetch user matches:", err);
+                return [];
+            }
+        }
+    },
+
+    // Detect opening name based on first 4 moves
+    detectOpening(moves) {
+        if (!moves || moves.length === 0) return "Unknown Opening";
+        const line = moves.slice(0, 4).join(" ");
+        
+        if (line.startsWith("e4 c5")) return "Sicilian Defense";
+        if (line.startsWith("e4 e5")) {
+            if (line.startsWith("e4 e5 Nf3 Nc6 Bb5")) return "Ruy Lopez";
+            if (line.startsWith("e4 e5 Nf3 Nc6 Bc4")) return "Italian Game";
+            if (line.startsWith("e4 e5 Nf3 Nf6")) return "Petrov's Defense";
+            return "Open Game";
+        }
+        if (line.startsWith("e4 e6")) return "French Defense";
+        if (line.startsWith("e4 c6")) return "Caro-Kann Defense";
+        if (line.startsWith("d4 d5")) {
+            if (line.startsWith("d4 d5 c4")) return "Queen's Gambit";
+            if (line.startsWith("d4 d5 Nf3")) return "Queen's Pawn Game";
+            return "Closed Game";
+        }
+        if (line.startsWith("d4 Nf6")) {
+            if (line.startsWith("d4 Nf6 c4 e6 Nf3 b6")) return "Queen's Indian Defense";
+            if (line.startsWith("d4 Nf6 c4 g6")) return "King's Indian Defense";
+            return "Indian Defense";
+        }
+        if (line.startsWith("Nf3")) return "Réti Opening";
+        if (line.startsWith("f4")) return "Bird's Opening";
+        if (line.startsWith("c4")) return "English Opening";
+        if (line.startsWith("g3")) return "King's Fianchetto";
+        
+        const firstMove = moves[0];
+        if (firstMove === "e4") return "King's Pawn Game";
+        if (firstMove === "d4") return "Queen's Pawn Game";
+        if (firstMove === "Nf3") return "Réti Opening";
+        if (firstMove === "c4") return "English Opening";
+        
+        return "Custom Opening";
     }
 };
 

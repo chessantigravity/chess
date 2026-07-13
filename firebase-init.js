@@ -213,3 +213,30 @@ export async function updateDoc(docRef, data) {
         throw new Error("Document does not exist");
     }
 }
+
+export function collection(dbInstance, collectionPath) {
+    if (!isMock) return FirebaseFirestore.collection(dbInstance, collectionPath);
+    return { collectionPath };
+}
+
+export function query(collectionRef, ...queryConstraints) {
+    if (!isMock) return FirebaseFirestore.query(collectionRef, ...queryConstraints);
+    return { collectionRef, queryConstraints };
+}
+
+export function where(fieldPath, opStr, value) {
+    if (!isMock) return FirebaseFirestore.where(fieldPath, opStr, value);
+    return { fieldPath, opStr, value };
+}
+
+export function orderBy(fieldPath, directionStr = "asc") {
+    if (!isMock) return FirebaseFirestore.orderBy(fieldPath, directionStr);
+    return { fieldPath, directionStr };
+}
+
+export async function getDocs(queryInstance) {
+    if (!isMock) return FirebaseFirestore.getDocs(queryInstance);
+    return {
+        forEach: (callback) => {}
+    };
+}

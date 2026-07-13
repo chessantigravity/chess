@@ -814,6 +814,33 @@ body {
     color: var(--bg) !important;
 }
 
+/* ---------- REPLAY MATCH OVERLAY ---------- */
+#replay-board-wrap .sq {
+    box-sizing: border-box;
+}
+#replay-board-wrap .sq.light { background: var(--sq-light); }
+#replay-board-wrap .sq.dark { background: var(--sq-dark); }
+#replay-board-wrap .sq.last-move-light { background-color: var(--sq-last-light) !important; opacity: 0.85; }
+#replay-board-wrap .sq.last-move-dark { background-color: var(--sq-last-dark) !important; opacity: 0.85; }
+
+.replay-move-item {
+    cursor: pointer;
+    padding: 0.15rem 0.35rem;
+    border-radius: 4px;
+    transition: background 0.1s;
+    display: inline-block;
+    color: var(--text2);
+}
+.replay-move-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text);
+}
+.replay-move-item.active {
+    background: var(--accent);
+    color: var(--bg) !important;
+    font-weight: 700;
+}
+
 /* ---------- RESPONSIVE ---------- */
 @media (max-width: 900px) {
     #game.active {

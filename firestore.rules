@@ -24,13 +24,10 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
-    // 5. Matches (Future Online Matchmaking docs)
+    // 5. Match History
     match /matches/{matchId} {
-      allow read: if request.auth != null;
-      // Allow write if the user is one of the participants in the match
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && 
-        (resource.data.whiteId == request.auth.uid || resource.data.blackId == request.auth.uid);
+      allow read, write: if request.auth != null && 
+        (resource == null || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid);
     }
     
     // 6. Puzzles Database (Read-only for all users)
