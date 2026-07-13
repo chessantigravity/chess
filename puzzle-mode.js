@@ -34,7 +34,8 @@ export function initPuzzleMode(user, isGuest) {
     document.getElementById("lobby").style.display = "none";
     document.getElementById("game").style.display = "none";
     document.getElementById("learn-academy").style.display = "none";
-    document.getElementById("puzzle-academy").style.display = "block";
+    document.getElementById("puzzle-academy").style.display = "flex";
+    document.getElementById("puzzle-academy").style.flexDirection = "column";
 
     // Bind Home Button
     document.getElementById("btn-puzzle-home").onclick = () => {
@@ -243,91 +244,108 @@ function renderPuzzleBoard() {
     wrap.innerHTML = "";
 
     const board = activeEngine.board();
-    const isFlipped = (activePuzzle.fen.split(" ")[1] === 'b'); // flip if black to play
+    const isFlipped = (activePuzzle.fen.split(" ")[1] === 'b');
+    const theme = document.documentElement.dataset.theme || 'mono';
 
-    // Get hint highlighting squares
+    // Square colors per theme — fully inline, no CSS class dependency
+    const darkCol  = theme === 'wood' ? '#b58863' : '#4a6477';
+    const lightCol = theme === 'wood' ? '#f0d9b5' : '#a9bfd1';
+    const selectedCol = '#7cb85e';
+    const hintCol = 'rgba(239,68,68,0.55)';
+
+    // Hint squares from the Hint button
     let hintSquares = [];
-    if (document.getElementById("puzzle-board-wrap").dataset.hintActive === "true") {
+    if (wrap.dataset.hintActive === "true") {
         const hintMove = activePuzzle.moves[currentMoveIndex];
         if (hintMove) {
-            // Standard SAN move conversion to from/to squares is complex;
-            // instead we parse legal moves list to match hint SAN moves
             const legalMoves = activeEngine.moves({ verbose: true });
-            const matched = legalMoves.find(m => m.san === hintMove || m.san.replace("#","").replace("+","") === hintMove.replace("#","").replace("+",""));
-            if (matched) {
-                hintSquares = [matched.from, matched.to];
-            }
+            const matched = legalMoves.find(m =>
+                m.san === hintMove ||
+                m.san.replace(/#|\+/g,'') === hintMove.replace(/#|\+/g,'')
+            );
+            if (matched) hintSquares = [matched.from, matched.to];
         }
     }
 
-    let hints = [];
+    // Legal destinations for selected piece
+    let legalDests = [];
     if (selectedSq) {
-        hints = activeEngine.moves({ square: selectedSq, verbose: true });
+        legalDests = activeEngine.moves({ square: selectedSq, verbose: true }).map(m => m.to);
     }
 
     for (let r = 0; r < 8; r++) {
         for (let c = 0; c < 8; c++) {
-            const squareName = String.fromCharCode(97 + c) + (8 - r);
-            const ri = isFlipped ? 7 - r : r;
-            const ci = isFlipped ? 7 - c : c;
-            const isDark = (r + c) % 2 === 1;
+            const sq        = String.fromCharCode(97 + c) + (8 - r);
+            const ri        = isFlipped ? 7 - r : r;
+            const ci        = isFlipped ? 7 - c : c;
+            const isDark    = (r + c) % 2 === 1;
+            const isSelected  = selectedSq === sq;
+            const isHintSq    = hintSquares.includes(sq);
+            const isLegalDest = legalDests.includes(sq);
+
+            let bgColor = isDark ? darkCol : lightCol;
+            if (isSelected) bgColor = selectedCol;
+            if (isHintSq)   bgColor = hintCol;
 
             const tile = document.createElement("div");
-            tile.className = `sq ${isDark ? 'dark' : 'light'}`;
-            tile.style.position = "absolute";
-            tile.style.width = "12.5%";
-            tile.style.height = "12.5%";
-            tile.style.top = `${ri * 12.5}%`;
-            tile.style.left = `${ci * 12.5}%`;
+            tile.style.cssText = [
+                "position:absolute",
+                "box-sizing:border-box",
+                `width:12.5%`,
+                `height:12.5%`,
+                `top:${ri * 12.5}%`,
+                `left:${ci * 12.5}%`,
+                `background:${bgColor}`,
+                "cursor:pointer",
+                "transition:background 0.1s"
+            ].join(";");
+            tile.setAttribute("data-sq", sq);
 
-            // Draw selection layout
-            if (selectedSq === squareName) {
-                tile.classList.add("selected");
-            }
-
-            // Draw hint highlights
-            if (hintSquares.includes(squareName)) {
-                tile.style.backgroundColor = "rgba(239, 68, 68, 0.45)"; // red flash for hint
-            }
-
-            // Draw Piece SVG
+            // Piece image
             const piece = board[r][c];
             if (piece) {
                 const img = document.createElement("img");
-                const pieceCode = `${piece.color}${PIECE_NAMES[piece.type]}`;
-                img.src = `assets/pieces/${pieceCode}.svg`;
-                img.className = "piece-img";
-                img.style.width = "100%";
-                img.style.height = "100%";
+                img.src = `assets/pieces/${piece.color}${PIECE_NAMES[piece.type]}.svg`;
+                img.style.cssText = "width:100%;height:100%;display:block;pointer-events:none;user-select:none;";
+                img.draggable = false;
                 tile.appendChild(img);
             }
 
-            // Draw move dots hints
-            const isHint = hints.some(h => h.to === squareName);
-            if (isHint) {
+            // Legal move indicator
+            if (isLegalDest) {
                 const hasPiece = board[r][c] !== null;
-                const hintDiv = document.createElement("div");
-                hintDiv.className = hasPiece ? "hint-ring" : "hint-dot";
-                hintDiv.style.left = "50%";
-                hintDiv.style.top = "50%";
-                hintDiv.style.transform = "translate(-50%, -50%)";
-                tile.appendChild(hintDiv);
+                const dot = document.createElement("div");
+                dot.style.cssText = [
+                    "position:absolute",
+                    "left:50%","top:50%",
+                    "transform:translate(-50%,-50%)",
+                    "pointer-events:none",
+                    "border-radius:50%",
+                    hasPiece
+                        ? "background:transparent;border:3px solid rgba(0,0,0,0.25);width:90%;height:90%"
+                        : "background:rgba(0,0,0,0.22);width:30%;height:30%"
+                ].join(";");
+                tile.appendChild(dot);
             }
 
-            // Interactive Click handler
-            tile.onclick = () => {
-                if (isHint) {
-                    executeUserMove(selectedSq, squareName);
-                } else {
-                    const p = board[r][c];
-                    if (p && p.color === activeEngine.turn()) {
-                        selectedSq = squareName;
-                        // Turn off highlight on click
-                        document.getElementById("puzzle-board-wrap").dataset.hintActive = "false";
-                        renderPuzzleBoard();
+            // Click — capture sq and isLegalDest in IIFE to avoid closure bugs
+            ;(function(sqName, sqR, sqC, legal) {
+                tile.onclick = () => {
+                    if (legal) {
+                        executeUserMove(selectedSq, sqName);
+                    } else {
+                        const p = activeEngine.board()[sqR][sqC];
+                        if (p && p.color === activeEngine.turn()) {
+                            selectedSq = sqName;
+                            wrap.dataset.hintActive = "false";
+                            renderPuzzleBoard();
+                        } else if (selectedSq) {
+                            selectedSq = null;
+                            renderPuzzleBoard();
+                        }
                     }
-                }
-            };
+                };
+            })(sq, r, c, isLegalDest);
 
             wrap.appendChild(tile);
         }

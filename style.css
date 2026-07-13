@@ -944,24 +944,42 @@ body {
 }
 
 /* ---------- PUZZLE QUEST MAP ---------- */
+#puzzle-academy {
+    height: calc(100vh - 60px);
+    overflow: hidden;
+    display: none;
+    padding: 0 !important;
+}
 .puzzle-container {
     display: grid;
     grid-template-columns: 360px 1fr;
     gap: 1.5rem;
-    height: calc(100vh - 80px);
+    height: 100%;
     overflow: hidden;
-    padding-top: 0.5rem;
+    padding: 1rem;
+    box-sizing: border-box;
 }
 .puzzle-sidebar {
     height: 100%;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+}
+#puzzle-map-scroll {
+    flex: 1;
+    min-height: 0;        /* CRITICAL: allows flex child to shrink and scroll */
+    overflow-y: auto;
+    position: relative;
+    background: var(--bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 2rem 0;
 }
 .puzzle-main {
     height: 100%;
     display: flex;
     flex-direction: column;
-    padding: 1.5rem;
+    overflow: hidden;
 }
 .map-level-node {
     position: absolute;
