@@ -9,12 +9,12 @@ import * as FirebaseFirestore from "firebase/firestore";
 
 // PLACEHOLDER CONFIG: Replace with your actual Firebase Project keys
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyAIs2ZY0AhPBVB-a_tfhiAqV0I3954rTvI",
+    authDomain: "chess-16d1a.firebaseapp.com",
+    projectId: "chess-16d1a",
+    storageBucket: "chess-16d1a.firebasestorage.app",
+    messagingSenderId: "249159711925",
+    appId: "1:249159711925:web:1dc18604b6ec76191792fc"
 };
 
 let app, auth, db;
