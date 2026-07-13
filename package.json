@@ -1,0 +1,24 @@
+{
+  "name": "antigravity-chess",
+  "version": "1.0.0",
+  "description": "Premium peer-to-peer online chess game",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chessantigravity/chess.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/chessantigravity/chess/issues"
+  },
+  "homepage": "https://github.com/chessantigravity/chess#readme",
+  "dependencies": {
+    "@vercel/speed-insights": "^2.0.0"
+  }
+}
