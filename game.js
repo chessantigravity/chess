@@ -566,14 +566,34 @@ const ChessGame = (() => {
             ((a.captured?10:0)+(a.san.includes('+')?5:0))
         );
 
-        let best = null, bestVal = Infinity;
+        // Evaluate all legal moves
+        const isWhite = chessEngine.turn() === 'w';
+        const candidates = [];
         for (const m of moves) {
             chessEngine.move(m);
-            const v = minimax(depth-1, -Infinity, Infinity, true);
+            // If it was white's turn, next is black (minimizing/maximizing=false) and vice-versa
+            const v = minimax(depth-1, -Infinity, Infinity, !isWhite);
             chessEngine.undo();
-            if (v < bestVal) { bestVal = v; best = m; }
+            candidates.push({ move: m, val: v });
         }
-        if (best) attemptMove(best.from, best.to, best.promotion || null);
+
+        // Determine best evaluation value
+        const bestVal = isWhite 
+            ? Math.max(...candidates.map(c => c.val))
+            : Math.min(...candidates.map(c => c.val));
+
+        // Group moves that are within 20 points (0.20 pawns) of the absolute best
+        const threshold = 20; // 0.20 pawns
+        const topCandidates = candidates.filter(c => 
+            isWhite ? (c.val >= bestVal - threshold) : (c.val <= bestVal + threshold)
+        );
+
+        // Randomly select one of these top-rated moves
+        const chosen = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+
+        if (chosen && chosen.move) {
+            attemptMove(chosen.move.from, chosen.move.to, chosen.move.promotion || null);
+        }
     }
 
     /* ---------- Sound FX ---------- */
