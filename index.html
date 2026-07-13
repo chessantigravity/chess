@@ -154,6 +154,16 @@
                 </button>
             </div>
         </div>
+
+        <!-- LEARN ACADEMY CARD -->
+        <div class="card" id="learn-academy-card">
+            <div class="card-icon">🎓</div>
+            <h2>Learn Academy</h2>
+            <p>Master central control, tactical patterns, and endgame conversions with interactive tasks.</p>
+            <button class="btn btn-secondary" id="btn-enter-academy" style="margin-top:auto;">
+                <i class="fa fa-graduation-cap"></i> Enter Academy
+            </button>
+        </div>
     </div>
 </section>
 
@@ -216,6 +226,62 @@
                 <button class="btn btn-primary" id="btn-chat-send" style="padding:0.6rem 0.8rem;">
                     <i class="fa fa-paper-plane"></i>
                 </button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============ LEARN CHESS ACADEMY ============ -->
+<section id="learn-academy" class="screen" style="display:none; overflow-y:auto; padding-bottom: 2rem;">
+    <div class="learn-container">
+        <!-- Left: Syllabus -->
+        <div class="learn-sidebar card">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--card-border); padding-bottom:0.75rem; margin-bottom:1rem;">
+                <h2 style="font-weight:800; font-size:1.15rem; margin:0;"><i class="fa fa-graduation-cap" style="color:var(--accent);"></i> Chess Academy</h2>
+                <div style="display:flex; gap:0.35rem;">
+                    <button class="btn btn-secondary btn-sm" id="btn-learn-reset" style="padding:0.4rem 0.6rem;" title="Reset Path"><i class="fa fa-sync-alt"></i> Reset</button>
+                    <button class="btn btn-secondary btn-sm" id="btn-learn-home" style="padding:0.4rem 0.6rem;"><i class="fa fa-house"></i> Home</button>
+                </div>
+            </div>
+            <div class="learn-progress-wrap" style="margin-bottom: 1.25rem;">
+                <div style="display:flex; justify-content:space-between; font-size:0.78rem; font-weight:700; color:var(--text2); margin-bottom:0.25rem;">
+                    <span>ACADEMY PROGRESS</span>
+                    <span id="learn-progress-pct">0%</span>
+                </div>
+                <div class="progress-bar-bg" style="width:100%; height:6px; background:rgba(255,255,255,0.05); border-radius:3px; overflow:hidden;">
+                    <div id="learn-progress-bar" style="width:0%; height:100%; background:var(--accent); transition: width 0.3s ease;"></div>
+                </div>
+            </div>
+            <div id="learn-syllabus-list" style="display:flex; flex-direction:column; gap:0.5rem; overflow-y:auto; flex:1; max-height:calc(100vh - 220px); padding-right:4px;">
+                <!-- Syllabus cards generated dynamically -->
+            </div>
+        </div>
+        
+        <!-- Right: Active Lesson main area -->
+        <div class="learn-main card">
+            <div id="lesson-header" style="border-bottom:1px solid var(--card-border); padding-bottom:1rem; margin-bottom:1rem; text-align:left;">
+                <span class="ai-badge easy" id="lesson-badge">Lesson 1</span>
+                <h1 style="font-size:1.6rem; font-weight:800; margin-top:0.45rem;" id="lesson-title">Lesson Title</h1>
+                <p style="color:var(--text2); font-size:0.88rem; margin-top:0.25rem;" id="lesson-subtitle">Short description</p>
+            </div>
+            
+            <div class="learn-tabs-bar" style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;">
+                <button class="tab-btn active" data-step="explain"><i class="fa fa-book-open"></i> Explanation</button>
+                <button class="tab-btn" data-step="demo"><i class="fa fa-play-circle"></i> Demonstration</button>
+                <button class="tab-btn" data-step="practice"><i class="fa fa-dumbbell"></i> Practice</button>
+                <button class="tab-btn" data-step="quiz"><i class="fa fa-question-circle"></i> Quiz</button>
+            </div>
+            
+            <!-- Step contents -->
+            <div class="learn-step-content" id="learn-pane-explain"></div>
+            <div class="learn-step-content" id="learn-pane-demo" style="display:none;"></div>
+            <div class="learn-step-content" id="learn-pane-practice" style="display:none;"></div>
+            <div class="learn-step-content" id="learn-pane-quiz" style="display:none;"></div>
+            
+            <!-- Lesson controls -->
+            <div style="display:flex; justify-content:space-between; margin-top:auto; border-top:1px solid var(--card-border); padding-top:1.25rem; flex-wrap:wrap; gap:0.75rem;">
+                <button class="btn btn-secondary" id="btn-learn-prev"><i class="fa fa-arrow-left"></i> Previous</button>
+                <button class="btn btn-primary" id="btn-learn-next">Next Step <i class="fa fa-arrow-right"></i></button>
             </div>
         </div>
     </div>
@@ -293,6 +359,35 @@
                 <div class="ai-card-title">Grandmaster AI</div>
                 <div class="ai-card-desc">Uncompromising tactical strength, quiescence search, and deep evaluation.</div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- ONBOARDING PATH MODAL -->
+<div class="overlay" id="learn-onboarding-overlay" style="display:none; z-index:1100;">
+    <div class="modal card" style="max-width: 440px; width: 95%; text-align:center; padding:1.75rem;">
+        <div style="font-size:3rem; margin-bottom:0.5rem;">🎓</div>
+        <h2 style="font-weight: 800; font-size:1.4rem;">Welcome to Chess Academy</h2>
+        <p style="color:#94a3b8; font-size:0.88rem; margin:0.35rem 0 1.25rem;">Select your experience level to generate your personalized learning path:</p>
+        
+        <h3 style="font-weight: 700; font-size: 0.92rem; margin-bottom:0.75rem; text-align:left; color:var(--text); text-transform:uppercase; letter-spacing:0.05em;">How much do you already know about chess?</h3>
+        <div style="display:flex; flex-direction:column; gap:0.6rem;">
+            <button class="btn btn-secondary path-choice-btn" data-level="new" style="justify-content:flex-start; padding:0.8rem 1.25rem; font-weight:600; text-align:left; display:block; width:100%;">
+                🟢 &nbsp; Completely New
+                <span style="font-size:0.75rem; font-weight:normal; color:var(--text2); display:block; margin-top:0.15rem; margin-left:1.75rem; white-space:normal; line-height:1.4;">I don't know anything about chess, rules, or pieces.</span>
+            </button>
+            <button class="btn btn-secondary path-choice-btn" data-level="basics" style="justify-content:flex-start; padding:0.8rem 1.25rem; font-weight:600; text-align:left; display:block; width:100%;">
+                🟡 &nbsp; Know the Basics
+                <span style="font-size:0.75rem; font-weight:normal; color:var(--text2); display:block; margin-top:0.15rem; margin-left:1.75rem; white-space:normal; line-height:1.4;">I know how pieces move but want to learn checks/castling.</span>
+            </button>
+            <button class="btn btn-secondary path-choice-btn" data-level="intermediate" style="justify-content:flex-start; padding:0.8rem 1.25rem; font-weight:600; text-align:left; display:block; width:100%;">
+                🔵 &nbsp; Intermediate
+                <span style="font-size:0.75rem; font-weight:normal; color:var(--text2); display:block; margin-top:0.15rem; margin-left:1.75rem; white-space:normal; line-height:1.4;">I understand all rules. I want to learn openings & basic tactics.</span>
+            </button>
+            <button class="btn btn-secondary path-choice-btn" data-level="advanced" style="justify-content:flex-start; padding:0.8rem 1.25rem; font-weight:600; text-align:left; display:block; width:100%;">
+                🔴 &nbsp; Advanced
+                <span style="font-size:0.75rem; font-weight:normal; color:var(--text2); display:block; margin-top:0.15rem; margin-left:1.75rem; white-space:normal; line-height:1.4;">I want to study tactics, strategy, and endgames.</span>
+            </button>
         </div>
     </div>
 </div>

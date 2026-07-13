@@ -110,6 +110,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btn-pass').addEventListener('click', startPass);
 
+    // Enter Chess Academy
+    document.getElementById("btn-enter-academy").addEventListener("click", () => {
+        import("./auth-service.js").then(({ AuthService }) => {
+            const user = AuthService.getCurrentUser();
+            const isGuest = AuthService.isGuest();
+            import("./learn-academy.js").then(({ initLearnAcademy }) => {
+                initLearnAcademy(user, isGuest);
+            });
+        });
+    });
+
     // In-game controls
     document.getElementById('btn-resign').addEventListener('click', () => {
         if (!confirm('Resign the game?')) return;

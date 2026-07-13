@@ -841,8 +841,121 @@ body {
     font-weight: 700;
 }
 
+/* ---------- LEARN CHESS ACADEMY ---------- */
+.learn-container {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 1.5rem;
+    height: calc(100vh - 80px);
+    overflow: hidden;
+    padding-top: 0.5rem;
+}
+.learn-sidebar {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 1.25rem;
+}
+.learn-main {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+.learn-tabs-bar {
+    border-bottom: 1px solid var(--card-border);
+    padding-bottom: 0.5rem;
+}
+.learn-tabs-bar .tab-btn {
+    padding: 0.45rem 0.9rem;
+    border-radius: 8px;
+    border: 1px solid var(--card-border);
+    background: var(--bg2);
+    color: var(--text2);
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 0.82rem;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.learn-tabs-bar .tab-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+.learn-tabs-bar .tab-btn:hover:not(.active) {
+    background: rgba(255,255,255,0.05);
+    color: var(--text);
+}
+.syllabus-item-btn {
+    width: 100%;
+    text-align: left;
+    background: var(--bg2);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 0.65rem 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.syllabus-item-btn.current {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(129, 182, 76, 0.2);
+}
+.syllabus-item-btn.completed {
+    background: rgba(129, 182, 76, 0.03);
+}
+.syllabus-item-btn:hover {
+    background: rgba(255,255,255,0.05);
+}
+.quiz-choice-btn {
+    width: 100%;
+    text-align: left;
+    padding: 0.75rem 1rem;
+    background: var(--bg2);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+    font-size: 0.88rem;
+    margin-bottom: 0.5rem;
+}
+.quiz-choice-btn:hover {
+    background: rgba(255,255,255,0.05);
+}
+.quiz-choice-btn.correct {
+    background: rgba(34, 197, 94, 0.12);
+    border-color: #22c55e;
+    color: #22c55e;
+    font-weight: 700;
+}
+.quiz-choice-btn.wrong {
+    background: rgba(239, 68, 68, 0.12);
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
 /* ---------- RESPONSIVE ---------- */
 @media (max-width: 900px) {
+    .learn-container {
+        grid-template-columns: 1fr !important;
+        height: auto !important;
+        overflow-y: auto !important;
+    }
+    .learn-sidebar {
+        height: auto !important;
+    }
+    .learn-main {
+        height: auto !important;
+    }
     #game.active {
         grid-template-columns: 1fr;
         height: auto;
