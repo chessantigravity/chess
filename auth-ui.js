@@ -45,6 +45,68 @@ document.addEventListener("DOMContentLoaded", () => {
         AuthService.enableGuestMode();
     };
 
+    // --- PROFILE EDIT MODAL BINDINGS ---
+    // Avatar picker selector grid
+    document.querySelectorAll(".picker-avatar").forEach(el => {
+        el.addEventListener("click", () => {
+            document.querySelectorAll(".picker-avatar").forEach(av => av.classList.remove("selected"));
+            el.classList.add("selected");
+        });
+    });
+
+    // Close edit modal
+    document.getElementById("btn-close-edit-modal").onclick = () => {
+        document.getElementById("profile-edit-overlay").style.display = "none";
+    };
+    document.getElementById("profile-edit-overlay").onclick = (e) => {
+        if (e.target.id === "profile-edit-overlay") {
+            document.getElementById("profile-edit-overlay").style.display = "none";
+        }
+    };
+
+    // Save profile changes form submit
+    const formEditProfile = document.getElementById("form-edit-profile");
+    formEditProfile.onsubmit = async (e) => {
+        e.preventDefault();
+        const user = AuthService.getCurrentUser();
+        if (!user) return;
+        
+        const username = document.getElementById("edit-username").value.trim();
+        const selectedAvatarEl = document.querySelector(".picker-avatar.selected");
+        const avatar = selectedAvatarEl ? selectedAvatarEl.getAttribute("data-char") : "👤";
+        const msg = document.getElementById("edit-profile-msg");
+        const btn = formEditProfile.querySelector("button[type='submit']");
+
+        if (!username) {
+            msg.textContent = "Username is required.";
+            msg.className = "auth-msg error";
+            return;
+        }
+
+        try {
+            btn.disabled = true;
+            btn.dataset.originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving…';
+            
+            await DbService.updateUserProfile(user.uid, { username, avatar });
+            
+            document.getElementById("profile-edit-overlay").style.display = "none";
+            btn.disabled = false;
+            btn.innerHTML = btn.dataset.originalText;
+            
+            // Refresh profiles dashboard
+            renderUserProfile(user.uid);
+            
+            // Notification toast
+            if (window.toast) window.toast("Profile updated successfully!");
+        } catch (err) {
+            btn.disabled = false;
+            btn.innerHTML = btn.dataset.originalText || "Save Changes";
+            msg.textContent = err.message || "Failed to update profile.";
+            msg.className = "auth-msg error";
+        }
+    };
+
     // --- FORM SUBMISSIONS ---
     
     // 1. SIGN IN
@@ -233,9 +295,14 @@ document.addEventListener("DOMContentLoaded", () => {
                             <div class="profile-joined">Joined: ${joinFormatted}</div>
                         </div>
                     </div>
-                    <button class="btn btn-secondary btn-sm" id="btn-logout" style="margin-top: 1rem; width: fit-content; padding: 0.45rem 0.9rem;">
-                        <i class="fa fa-sign-out-alt"></i> Sign Out
-                    </button>
+                    <div style="display:flex; gap:0.5rem; margin-top: 1rem;">
+                        <button class="btn btn-secondary btn-sm" id="btn-edit-profile" style="padding: 0.45rem 0.9rem;">
+                            <i class="fa fa-edit"></i> Edit
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="btn-logout" style="padding: 0.45rem 0.9rem;">
+                            <i class="fa fa-sign-out-alt"></i> Sign Out
+                        </button>
+                    </div>
                 </div>
                 <!-- Right: Stats Panel Grid -->
                 <div class="profile-card-right">
@@ -261,15 +328,23 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                     <div class="profile-stat-box">
                         <span class="profile-stat-val" style="font-size: 0.85rem; padding-top: 0.25rem;">${profile.highestAIDefeated || "None"}</span>
-                        <span class="profile-stat-lbl">Best AI Beaten</span>
+                        <span class="profile-stat-lbl">Best AI</span>
+                    </div>
+                    <div class="profile-stat-box">
+                        <span class="profile-stat-val" style="font-size: 0.85rem; padding-top: 0.25rem;">${profile.favoriteOpening || "None"}</span>
+                        <span class="profile-stat-lbl">Opening</span>
                     </div>
                     <div class="profile-stat-box">
                         <span class="profile-stat-val">${profile.puzzleProgress || 0}</span>
-                        <span class="profile-stat-lbl">Puzzles Solved</span>
+                        <span class="profile-stat-lbl">Puzzles</span>
+                    </div>
+                    <div class="profile-stat-box">
+                        <span class="profile-stat-val">${profile.learningProgress || 0}</span>
+                        <span class="profile-stat-lbl">Lessons</span>
                     </div>
                     <div class="profile-stat-box">
                         <span class="profile-stat-val">${achievementsCount}/5</span>
-                        <span class="profile-stat-lbl">Achievements</span>
+                        <span class="profile-stat-lbl">Trophies</span>
                     </div>
                 </div>
             `;
@@ -277,6 +352,32 @@ document.addEventListener("DOMContentLoaded", () => {
             // Bind sign out click
             document.getElementById("btn-logout").onclick = async () => {
                 await AuthService.logout();
+            };
+
+            // Bind edit profile click
+            document.getElementById("btn-edit-profile").onclick = () => {
+                const editModal = document.getElementById("profile-edit-overlay");
+                const usernameInput = document.getElementById("edit-username");
+                const msg = document.getElementById("edit-profile-msg");
+                
+                // Reset message
+                msg.textContent = "";
+                msg.className = "auth-msg";
+                
+                // Pre-fill username
+                usernameInput.value = profile.username;
+                
+                // Pre-select avatar symbol in picker grid
+                const currentAvatar = profile.avatar || "👤";
+                document.querySelectorAll(".picker-avatar").forEach(el => {
+                    if (el.getAttribute("data-char") === currentAvatar) {
+                        el.classList.add("selected");
+                    } else {
+                        el.classList.remove("selected");
+                    }
+                });
+                
+                editModal.style.display = "flex";
             };
 
         } catch (e) {

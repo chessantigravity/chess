@@ -39,6 +39,7 @@ export const DbService = {
             draws: 0,
             winPercentage: 0,
             highestAIDefeated: "None",
+            favoriteOpening: "None", // Future support
             puzzleProgress: 0,
             learningProgress: 0,
             achievements: [],

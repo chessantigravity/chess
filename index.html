@@ -267,6 +267,40 @@
     </div>
 </div>
 
+<!-- PROFILE EDIT MODAL -->
+<div class="overlay" id="profile-edit-overlay" style="display:none;">
+    <div class="modal card" style="max-width: 400px; width: 95%;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+            <h2 style="font-weight: 800; font-size:1.3rem; margin:0;">Edit Profile</h2>
+            <button class="btn btn-sm btn-secondary" id="btn-close-edit-modal" style="padding:0.4rem 0.6rem;"><i class="fa fa-times"></i></button>
+        </div>
+        <form id="form-edit-profile">
+            <div class="auth-field" style="margin-bottom: 1rem;">
+                <label class="auth-label" for="edit-username">Username</label>
+                <input class="inp" id="edit-username" type="text" required style="width:100%; box-sizing:border-box;">
+            </div>
+            
+            <div class="auth-field" style="margin-bottom: 1.5rem;">
+                <label class="auth-label">Choose Avatar</label>
+                <div class="avatar-picker-grid">
+                    <span class="picker-avatar selected" data-char="👤">👤</span>
+                    <span class="picker-avatar" data-char="♞">♞</span>
+                    <span class="picker-avatar" data-char="👑">👑</span>
+                    <span class="picker-avatar" data-char="🏰">🏰</span>
+                    <span class="picker-avatar" data-char="⚔️">⚔️</span>
+                    <span class="picker-avatar" data-char="🔮">🔮</span>
+                    <span class="picker-avatar" data-char="🌟">🌟</span>
+                </div>
+            </div>
+            
+            <button class="btn btn-primary" type="submit" style="width:100%;">
+                <i class="fa fa-save"></i> Save Changes
+            </button>
+            <div class="auth-msg" id="edit-profile-msg"></div>
+        </form>
+    </div>
+</div>
+
 <!-- GAME OVER MODAL -->
 <div class="overlay" id="gameover-overlay" style="display:none;">
     <div class="modal card" style="text-align:center;">

@@ -786,6 +786,34 @@ body {
     letter-spacing: 0.05em;
 }
 
+/* ---------- AVATAR PICKER ---------- */
+.avatar-picker-grid {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: space-between;
+    padding: 0.5rem;
+    background: var(--bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    margin-top: 0.25rem;
+}
+.picker-avatar {
+    font-size: 1.4rem;
+    cursor: pointer;
+    padding: 0.3rem 0.5rem;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.picker-avatar:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+.picker-avatar.selected {
+    background: var(--accent);
+    color: var(--bg) !important;
+}
+
 /* ---------- RESPONSIVE ---------- */
 @media (max-width: 900px) {
     #game.active {
