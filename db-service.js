@@ -45,7 +45,8 @@ export const DbService = {
             winPercentage: 0,
             highestAIDefeated: "None",
             favoriteOpening: "None", // Future support
-            puzzleProgress: 0,
+            puzzleProgress: 1,       // Highest unlocked puzzle level (starts at 1)
+            puzzleStars: {},          // { levelId: starCount } e.g. { 1: 3, 2: 2 }
             learningProgress: 0,
             achievements: [],
             settings: {

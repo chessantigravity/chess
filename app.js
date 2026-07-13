@@ -121,6 +121,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Enter Puzzle Quest
+    document.getElementById("btn-enter-puzzles").addEventListener("click", () => {
+        import("./auth-service.js").then(({ AuthService }) => {
+            const user = AuthService.getCurrentUser();
+            const isGuest = AuthService.isGuest();
+            import("./puzzle-mode.js").then(({ initPuzzleMode }) => {
+                initPuzzleMode(user, isGuest);
+            });
+        });
+    });
+
     // In-game controls
     document.getElementById('btn-resign').addEventListener('click', () => {
         if (!confirm('Resign the game?')) return;

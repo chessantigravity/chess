@@ -346,8 +346,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         <span class="profile-stat-lbl">Opening</span>
                     </div>
                     <div class="profile-stat-box">
-                        <span class="profile-stat-val">${profile.puzzleProgress || 0}</span>
-                        <span class="profile-stat-lbl">Puzzles</span>
+                        <span class="profile-stat-val"><i class="fa fa-star" style="color:#fbbf24; font-size:0.9em;"></i> ${Object.values(profile.puzzleStars || {}).reduce((a,b)=>a+b,0)}</span>
+                        <span class="profile-stat-lbl">Puzzle ★</span>
                     </div>
                     <div class="profile-stat-box">
                         <span class="profile-stat-val">${profile.learningProgress || 0}</span>
