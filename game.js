@@ -39,6 +39,7 @@ const ChessGame = (() => {
     let dragStartSq = null;  // starting square coordinate string (e.g. "e2")
     let dragOffsetX = 0;     // horizontal offset of pointer from piece center
     let dragOffsetY = 0;     // vertical offset of pointer from piece center
+    let aiThinkTimeout = null; // scheduled AI move execution timer
 
     /* ---------- Coordinate helpers ---------- */
     const files = 'abcdefgh';
@@ -61,6 +62,10 @@ const ChessGame = (() => {
 
     /* ---------- Public init ---------- */
     function startGame(color) {
+        if (aiThinkTimeout) {
+            clearTimeout(aiThinkTimeout);
+            aiThinkTimeout = null;
+        }
         chessEngine = new Chess();
         myColor  = color;
         flipped  = (color === 'b');
@@ -73,7 +78,7 @@ const ChessGame = (() => {
 
         // If AI plays first (we are black in AI mode)
         if (window.APP && APP.mode === 'ai' && color === 'b') {
-            setTimeout(doAIMove, 700);
+            doAIMove();
         }
     }
 
@@ -499,42 +504,243 @@ const ChessGame = (() => {
         return t === myColor; // online
     }
 
-    /* ======================
-       AI (Minimax + αβ)
-       ====================== */
-    const PV = { p:100, n:320, b:330, r:500, q:900, k:20000 };
+    /* =================================================================
+       AI ENGINE OVERHAUL (Adaptive 6-Level Engine)
+       ================================================================= */
+    
+    // Piece Values (Standard Centipawn values)
+    const PV = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+
+    // Standard Piece-Square Tables (Development / Middlegame placement)
     const PST = {
-        p:[[0,0,0,0,0,0,0,0],[50,50,50,50,50,50,50,50],[10,10,20,30,30,20,10,10],[5,5,10,25,25,10,5,5],[0,0,0,20,20,0,0,0],[5,-5,-10,0,0,-10,-5,5],[5,10,10,-20,-20,10,10,5],[0,0,0,0,0,0,0,0]],
-        n:[[-50,-40,-30,-30,-30,-30,-40,-50],[-40,-20,0,0,0,0,-20,-40],[-30,0,10,15,15,10,0,-30],[-30,5,15,20,20,15,5,-30],[-30,0,15,20,20,15,0,-30],[-30,5,10,15,15,10,5,-30],[-40,-20,0,5,5,0,-20,-40],[-50,-40,-30,-30,-30,-30,-40,-50]],
-        b:[[-20,-10,-10,-10,-10,-10,-10,-20],[-10,0,0,0,0,0,0,-10],[-10,0,5,10,10,5,0,-10],[-10,5,5,10,10,5,5,-10],[-10,0,10,10,10,10,0,-10],[-10,10,10,10,10,10,10,-10],[-10,5,0,0,0,0,5,-10],[-20,-10,-10,-10,-10,-10,-10,-20]],
-        r:[[0,0,0,0,0,0,0,0],[5,10,10,10,10,10,10,5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[0,0,0,5,5,0,0,0]],
-        q:[[-20,-10,-10,-5,-5,-10,-10,-20],[-10,0,0,0,0,0,0,-10],[-10,0,5,5,5,5,0,-10],[-5,0,5,5,5,5,0,-5],[0,0,5,5,5,5,0,-5],[-10,5,5,5,5,5,0,-10],[-10,0,5,0,0,5,0,-10],[-20,-10,-10,-5,-5,-10,-10,-20]],
-        k:[[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-20,-30,-30,-40,-40,-30,-30,-20],[-10,-20,-20,-20,-20,-20,-20,-10],[20,20,0,0,0,0,20,20],[20,30,10,0,0,10,30,20]]
+        p: [
+            [0,  0,  0,  0,  0,  0,  0,  0],
+            [50, 50, 50, 50, 50, 50, 50, 50],
+            [10, 10, 20, 30, 30, 20, 10, 10],
+            [5,  5, 10, 25, 25, 10,  5,  5],
+            [0,  0,  0, 20, 20,  0,  0,  0],
+            [5, -5,-10,  0,  0,-10, -5,  5],
+            [5, 10, 10,-20,-20, 10, 10,  5],
+            [0,  0,  0,  0,  0,  0,  0,  0]
+        ],
+        n: [
+            [-50,-40,-30,-30,-30,-30,-40,-50],
+            [-40,-20,  0,  0,  0,  0,-20,-40],
+            [-30,  0, 10, 15, 15, 10,  0,-30],
+            [-30,  5, 15, 20, 20, 15,  5,-30],
+            [-30,  0, 15, 20, 20, 15,  0,-30],
+            [-30,  5, 10, 15, 15, 10,  5,-30],
+            [-40,-20,  0,  5,  5,  0,-20,-40],
+            [-50,-40,-30,-30,-30,-30,-40,-50]
+        ],
+        b: [
+            [-20,-10,-10,-10,-10,-10,-10,-20],
+            [-10,  0,  0,  0,  0,  0,  0,-10],
+            [-10,  0,  5, 10, 10,  5,  0,-10],
+            [-10,  5,  5, 10, 10,  5,  5,-10],
+            [-10,  0, 10, 10, 10, 10,  0,-10],
+            [-10, 10, 10, 10, 10, 10, 10,-10],
+            [-10,  5,  0,  0,  0,  0,  5,-10],
+            [-20,-10,-10,-10,-10,-10,-10,-20]
+        ],
+        r: [
+            [0,  0,  0,  0,  0,  0,  0,  0],
+            [5, 10, 10, 10, 10, 10, 10,  5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [0,  0,  0,  5,  5,  0,  0,  0]
+        ],
+        q: [
+            [-20,-10,-10, -5, -5,-10,-10,-20],
+            [-10,  0,  0,  0,  0,  0,  0,-10],
+            [-10,  0,  5,  5,  5,  5,  0,-10],
+            [-5,  0,  5,  5,  5,  5,  0, -5],
+            [0,  0,  5,  5,  5,  5,  0, -5],
+            [-10,  5,  5,  5,  5,  5,  0,-10],
+            [-10,  0,  5,  0,  0,  5,  0,-10],
+            [-20,-10,-10, -5, -5,-10,-10,-20]
+        ],
+        k: [
+            [-30,-40,-40,-50,-50,-40,-40,-30],
+            [-30,-40,-40,-50,-50,-40,-40,-30],
+            [-30,-40,-40,-50,-50,-40,-40,-30],
+            [-30,-40,-40,-50,-50,-40,-40,-30],
+            [-20,-30,-30,-40,-40,-30,-30,-20],
+            [-10,-20,-20,-20,-20,-20,-20,-10],
+            [20, 20,  0,  0,  0,  0, 20, 20],
+            [20, 30, 10,  0,  0, 10, 30, 20]
+        ]
     };
 
-    function evalBoard() {
+    // Endgame King Table (helps the king participate in checkmates/pawn promotion)
+    const PST_K_END = [
+        [-50,-40,-30,-20,-20,-30,-40,-50],
+        [-30,-20,-10,  0,  0,-10,-20,-30],
+        [-30,-10, 20, 30, 30, 20,-10,-30],
+        [-30,-10, 30, 40, 40, 30,-10,-30],
+        [-30,-10, 30, 40, 40, 30,-10,-30],
+        [-30,-10, 20, 30, 30, 20,-10,-30],
+        [-30,-30,  0,  0,  0,  0,-30,-30],
+        [-50,-30,-30,-30,-30,-30,-30,-50]
+    ];
+
+    // Order moves to maximize Alpha-Beta pruning performance (MVV-LVA)
+    function scoreMove(m) {
         let score = 0;
-        const bd = chessEngine.board();
-        for (let r = 0; r < 8; r++)
-            for (let c = 0; c < 8; c++) {
-                const p = bd[r][c];
-                if (!p) continue;
-                const ri = p.color === 'w' ? r : 7-r;
-                const ci = p.color === 'w' ? c : 7-c;
-                const v  = PV[p.type] + (PST[p.type]?.[ri]?.[ci] || 0);
-                score += p.color === 'w' ? v : -v;
-            }
+        if (m.captured) {
+            const victimVal = PV[m.captured] || 0;
+            const attackerVal = PV[m.piece] || 0;
+            score += 1000 + (victimVal - attackerVal / 100);
+        }
+        if (m.promotion) {
+            score += 900;
+        }
+        if (m.san && m.san.includes('+')) {
+            score += 50;
+        }
         return score;
     }
 
-    function minimax(depth, alpha, beta, maximizing) {
-        if (depth === 0 || chessEngine.game_over()) return evalBoard();
+    // Adaptive Board Evaluation heuristic based on AI Level
+    function evalBoard() {
+        const bd = chessEngine.board();
+        const level = (window.APP && APP.aiLevel) || 'medium';
+
+        let score = 0;
+        let whiteMaterial = 0;
+        let blackMaterial = 0;
+        let whiteBishops = 0;
+        let blackBishops = 0;
+
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const p = bd[r][c];
+                if (!p) continue;
+                const val = PV[p.type] || 0;
+                if (p.color === 'w') {
+                    whiteMaterial += val;
+                    if (p.type === 'b') whiteBishops++;
+                } else {
+                    blackMaterial += val;
+                    if (p.type === 'b') blackBishops++;
+                }
+            }
+        }
+
+        const isEndgame = ((whiteMaterial - 20000) + (blackMaterial - 20000)) < 1600;
+
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const p = bd[r][c];
+                if (!p) continue;
+
+                const color = p.color;
+                const isWhite = color === 'w';
+                const ri = isWhite ? r : 7 - r;
+                const ci = isWhite ? c : 7 - c;
+
+                // 1. Material Evaluation
+                let pScore = PV[p.type] || 0;
+
+                // 2. Positional Development Tables (PST)
+                if (level !== 'easy') {
+                    if (level === 'medium') {
+                        // Medium level only positional evaluation on Pawns and Knights
+                        if (p.type === 'p' || p.type === 'n') {
+                            pScore += PST[p.type]?.[ri]?.[ci] || 0;
+                        }
+                    } else {
+                        // Hard, Expert, Master, Grandmaster use full tables
+                        if (p.type === 'k' && isEndgame) {
+                            pScore += PST_K_END[ri]?.[ci] || 0;
+                        } else {
+                            pScore += PST[p.type]?.[ri]?.[ci] || 0;
+                        }
+                    }
+                }
+
+                // 3. Expert / Master / Grandmaster Advanced Positional Analysis
+                if (level === 'expert' || level === 'master' || level === 'grandmaster') {
+                    // Passed pawns bonus
+                    if (p.type === 'p') {
+                        pScore += ri * 2.2;
+                    }
+                    // King safety castling checklist
+                    if (p.type === 'k' && !isEndgame && chessEngine.history().length < 24) {
+                        const castling = chessEngine.get_castling_rights(color);
+                        if (!castling.k && !castling.q) pScore -= 45;
+                    }
+                }
+
+                score += isWhite ? pScore : -pScore;
+            }
+        }
+
+        // 4. Strategic Team-wide analysis (Master & Grandmaster)
+        if (level === 'master' || level === 'grandmaster') {
+            // Bishop pair bonus (+30)
+            if (whiteBishops >= 2) score += 30;
+            if (blackBishops >= 2) score -= 30;
+
+            // Mobility bonus (active piece density weight)
+            const legalMoves = chessEngine.moves({ verbose: true });
+            const mobilityBonus = legalMoves.length * 0.45;
+            score += chessEngine.turn() === 'w' ? mobilityBonus : -mobilityBonus;
+        }
+
+        return score;
+    }
+
+    // Quiescence Search (capture resolves leaves to prevent horizon blunders)
+    function quiescence(alpha, beta, maximizing) {
+        const standPat = evalBoard();
+        if (maximizing) {
+            if (standPat >= beta) return beta;
+            if (standPat > alpha) alpha = standPat;
+            const moves = chessEngine.moves({ verbose: true }).filter(m => m.captured);
+            moves.sort((a, b) => scoreMove(b) - scoreMove(a));
+            for (const m of moves) {
+                chessEngine.move(m);
+                const score = quiescence(alpha, beta, false);
+                chessEngine.undo();
+                if (score >= beta) return beta;
+                if (score > alpha) alpha = score;
+            }
+            return alpha;
+        } else {
+            if (standPat <= alpha) return alpha;
+            if (standPat < beta) beta = standPat;
+            const moves = chessEngine.moves({ verbose: true }).filter(m => m.captured);
+            moves.sort((a, b) => scoreMove(b) - scoreMove(a));
+            for (const m of moves) {
+                chessEngine.move(m);
+                const score = quiescence(alpha, beta, true);
+                chessEngine.undo();
+                if (score <= alpha) return alpha;
+                if (score < beta) beta = score;
+            }
+            return beta;
+        }
+    }
+
+    // Minimax search with full Alpha-Beta pruning & MVV-LVA move ordering
+    function minimax(depth, alpha, beta, maximizing, useQuiescence) {
+        if (depth === 0) {
+            return useQuiescence ? quiescence(alpha, beta, maximizing) : evalBoard();
+        }
+        if (chessEngine.game_over()) return evalBoard();
+
         const moves = chessEngine.moves({ verbose: true });
+        moves.sort((a, b) => scoreMove(b) - scoreMove(a));
+
         if (maximizing) {
             let best = -Infinity;
             for (const m of moves) {
                 chessEngine.move(m);
-                best = Math.max(best, minimax(depth-1, alpha, beta, false));
+                best = Math.max(best, minimax(depth - 1, alpha, beta, false, useQuiescence));
                 chessEngine.undo();
                 alpha = Math.max(alpha, best);
                 if (beta <= alpha) break;
@@ -544,7 +750,7 @@ const ChessGame = (() => {
             let best = Infinity;
             for (const m of moves) {
                 chessEngine.move(m);
-                best = Math.min(best, minimax(depth-1, alpha, beta, true));
+                best = Math.min(best, minimax(depth - 1, alpha, beta, true, useQuiescence));
                 chessEngine.undo();
                 beta = Math.min(beta, best);
                 if (beta <= alpha) break;
@@ -553,46 +759,97 @@ const ChessGame = (() => {
         }
     }
 
+    // Perform AI calculation and trigger delayed move
     function doAIMove() {
         if (chessEngine.game_over()) return;
-        const diff  = parseInt(document.getElementById('sel-diff')?.value || '2');
-        const depth = diff === 1 ? 2 : diff === 3 ? 4 : 3;
+
+        const level = (window.APP && APP.aiLevel) || 'medium';
+        
+        // Define difficulty profiles (search depth, quiescence state, selection randomness thresholds)
+        let depth = 3;
+        let useQuiescence = false;
+        let threshold = 20; // in centipawns
+        let minDelay = 500, maxDelay = 1200;
+
+        switch (level) {
+            case 'easy':
+                depth = 1;
+                useQuiescence = false;
+                threshold = 60; // broad selection of near-equal moves
+                minDelay = 400; maxDelay = 900;
+                break;
+            case 'medium':
+                depth = 2;
+                useQuiescence = false;
+                threshold = 30;
+                minDelay = 500; maxDelay = 1200;
+                break;
+            case 'hard':
+                depth = 3;
+                useQuiescence = false;
+                threshold = 20;
+                minDelay = 700; maxDelay = 1600;
+                break;
+            case 'expert':
+                depth = 3;
+                useQuiescence = true;
+                threshold = 15;
+                minDelay = 1000; maxDelay = 2200;
+                break;
+            case 'master':
+                depth = 4;
+                useQuiescence = true;
+                threshold = 10;
+                minDelay = 1200; maxDelay = 3000;
+                break;
+            case 'grandmaster':
+                depth = 5;
+                useQuiescence = true;
+                threshold = 5; // extremely strict selection
+                minDelay = 1500; maxDelay = 3500;
+                break;
+        }
+
         const moves = chessEngine.moves({ verbose: true });
         if (!moves.length) return;
 
-        // Sort: captures & checks first for better pruning
-        moves.sort((a,b) =>
-            ((b.captured?10:0)+(b.san.includes('+')?5:0)) -
-            ((a.captured?10:0)+(a.san.includes('+')?5:0))
-        );
+        // MVV-LVA move ordering prior to minimax evaluation
+        moves.sort((a, b) => scoreMove(b) - scoreMove(a));
 
-        // Evaluate all legal moves
         const isWhite = chessEngine.turn() === 'w';
         const candidates = [];
         for (const m of moves) {
             chessEngine.move(m);
-            // If it was white's turn, next is black (minimizing/maximizing=false) and vice-versa
-            const v = minimax(depth-1, -Infinity, Infinity, !isWhite);
+            const v = minimax(depth - 1, -Infinity, Infinity, !isWhite, useQuiescence);
             chessEngine.undo();
             candidates.push({ move: m, val: v });
         }
 
-        // Determine best evaluation value
+        // Best minimax rating based on active side
         const bestVal = isWhite 
             ? Math.max(...candidates.map(c => c.val))
             : Math.min(...candidates.map(c => c.val));
 
-        // Group moves that are within 20 points (0.20 pawns) of the absolute best
-        const threshold = 20; // 0.20 pawns
+        // Gather moves within ELO-specific threshold (e.g. 0.20 pawns = 20 pts)
         const topCandidates = candidates.filter(c => 
             isWhite ? (c.val >= bestVal - threshold) : (c.val <= bestVal + threshold)
         );
 
-        // Randomly select one of these top-rated moves
+        // Pick random top candidate move
         const chosen = topCandidates[Math.floor(Math.random() * topCandidates.length)];
 
         if (chosen && chosen.move) {
-            attemptMove(chosen.move.from, chosen.move.to, chosen.move.promotion || null);
+            const chosenMove = chosen.move;
+            const delay = minDelay + Math.random() * (maxDelay - minDelay);
+            
+            // Clean up any existing think timer
+            if (aiThinkTimeout) clearTimeout(aiThinkTimeout);
+            
+            aiThinkTimeout = setTimeout(() => {
+                // Confirm state has not changed (e.g., player returned to lobby or resigned during delay)
+                if (!window.APP || APP.mode !== 'ai' || chessEngine.game_over()) return;
+                attemptMove(chosenMove.from, chosenMove.to, chosenMove.promotion || null);
+            }, delay);
         }
     }
 

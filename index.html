@@ -101,12 +101,6 @@
             <hr style="border-color:#ffffff10;margin:1.25rem 0;">
 
             <h3 style="margin-bottom:0.5rem;">Offline Modes</h3>
-            <label class="field-label" for="sel-diff">AI Difficulty</label>
-            <select class="inp" id="sel-diff">
-                <option value="1">Easy (depth 2)</option>
-                <option value="2" selected>Medium (depth 3)</option>
-                <option value="3">Hard (depth 4)</option>
-            </select>
             <div style="display:flex;gap:0.75rem;margin-top:0.75rem;">
                 <button class="btn btn-secondary" id="btn-ai" style="flex:1">
                     <i class="fa fa-robot"></i> vs AI
@@ -190,6 +184,72 @@
     <div class="modal card">
         <h3>Choose Promotion</h3>
         <div id="promo-choices" style="display:flex;gap:1rem;justify-content:center;margin-top:1rem;"></div>
+    </div>
+</div>
+
+<!-- AI DIFFICULTY OVERLAY -->
+<div class="overlay" id="ai-overlay" style="display:none;">
+    <div class="modal card" style="max-width: 520px; width: 95%;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+            <h2 style="font-weight: 800; font-size:1.3rem; margin:0;">Select AI Difficulty</h2>
+            <button class="btn btn-sm btn-secondary" id="btn-close-ai-modal" style="padding:0.4rem 0.6rem;"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="ai-levels-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; max-height:calc(100vh - 180px); overflow-y:auto; padding-right:4px;">
+            <!-- Easy Card -->
+            <div class="ai-card" data-level="easy">
+                <div class="ai-card-header">
+                    <span class="ai-badge easy">Easy</span>
+                    <span class="ai-elo">~600 Elo</span>
+                </div>
+                <div class="ai-card-title">Easy AI</div>
+                <div class="ai-card-desc">Plays basic material chess. Makes human-like minor oversights.</div>
+            </div>
+            <!-- Medium Card -->
+            <div class="ai-card" data-level="medium">
+                <div class="ai-card-header">
+                    <span class="ai-badge medium">Medium</span>
+                    <span class="ai-elo">~1000 Elo</span>
+                </div>
+                <div class="ai-card-title">Medium AI</div>
+                <div class="ai-card-desc">Understands development and basic piece placements.</div>
+            </div>
+            <!-- Hard Card -->
+            <div class="ai-card" data-level="hard">
+                <div class="ai-card-header">
+                    <span class="ai-badge hard">Hard</span>
+                    <span class="ai-elo">~1400 Elo</span>
+                </div>
+                <div class="ai-card-title">Hard AI</div>
+                <div class="ai-card-desc">Plays positionally sound chess. Punishes tactical mistakes.</div>
+            </div>
+            <!-- Expert Card -->
+            <div class="ai-card" data-level="expert">
+                <div class="ai-card-header">
+                    <span class="ai-badge expert">Expert</span>
+                    <span class="ai-elo">~1800 Elo</span>
+                </div>
+                <div class="ai-card-title">Expert AI</div>
+                <div class="ai-card-desc">Advanced positional play, active piece dynamics, and king safety.</div>
+            </div>
+            <!-- Master Card -->
+            <div class="ai-card" data-level="master">
+                <div class="ai-card-header">
+                    <span class="ai-badge master">Master</span>
+                    <span class="ai-elo">~2200 Elo</span>
+                </div>
+                <div class="ai-card-title">Master AI</div>
+                <div class="ai-card-desc">Deep strategic planning, double-pawns analysis, and endgame accuracy.</div>
+            </div>
+            <!-- Grandmaster Card -->
+            <div class="ai-card" data-level="grandmaster">
+                <div class="ai-card-header">
+                    <span class="ai-badge grandmaster">Grandmaster</span>
+                    <span class="ai-elo">~2600+ Elo</span>
+                </div>
+                <div class="ai-card-title">Grandmaster AI</div>
+                <div class="ai-card-desc">Uncompromising tactical strength, quiescence search, and deep evaluation.</div>
+            </div>
+        </div>
     </div>
 </div>
 

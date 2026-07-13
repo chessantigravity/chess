@@ -488,6 +488,63 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 10px; }
 
+/* ---------- AI DIFFICULTY CARDS ---------- */
+.ai-card {
+    background: var(--bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    user-select: none;
+    -webkit-user-select: none;
+    text-align: left;
+}
+.ai-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    background: var(--bg2);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+.ai-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.ai-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    border-radius: 99px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.ai-badge.easy { background: rgba(34, 197, 94, 0.12); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.25); }
+.ai-badge.medium { background: rgba(59, 130, 246, 0.12); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.25); }
+.ai-badge.hard { background: rgba(168, 85, 247, 0.12); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.25); }
+.ai-badge.expert { background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.25); }
+.ai-badge.master { background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.25); }
+.ai-badge.grandmaster { background: rgba(236, 72, 153, 0.12); color: #ec4899; border: 1px solid rgba(236, 72, 153, 0.25); }
+
+.ai-elo {
+    font-size: 0.78rem;
+    font-weight: 800;
+    color: var(--text2);
+}
+.ai-card-title {
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: var(--text);
+}
+.ai-card-desc {
+    font-size: 0.75rem;
+    color: var(--text2);
+    line-height: 1.4;
+}
+
 /* ---------- RESPONSIVE ---------- */
 @media (max-width: 900px) {
     #game.active {
@@ -501,6 +558,7 @@ body {
         max-height: 95vw;  /* on mobile: almost full width */
     }
     #app-main { padding: 0.5rem 0.75rem; }
+    .ai-levels-grid { grid-template-columns: 1fr !important; }
 }
 @media (max-width: 520px) {
     .logo-text { display: none; }

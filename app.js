@@ -9,6 +9,7 @@ window.APP = {
     clocks:        { w: 0, b: 0, inc: 0 },
     timerInterval: null,
     preset:        { min: 3, inc: 2 },
+    aiLevel:       'medium',      // 'easy' | 'medium' | 'hard' | 'expert' | 'master' | 'grandmaster'
 
     onMoveDone(movedColor) {
         // Increment for the player who just moved
@@ -82,7 +83,31 @@ document.addEventListener('DOMContentLoaded', () => {
         joinGame(val);
     });
     document.getElementById('btn-cancel-host').addEventListener('click', cancelHost);
-    document.getElementById('btn-ai').addEventListener('click', startAI);
+    
+    // Show AI difficulty selection modal instead of starting immediately
+    document.getElementById('btn-ai').addEventListener('click', () => {
+        document.getElementById('ai-overlay').style.display = 'flex';
+    });
+
+    // Close AI modal logic
+    document.getElementById('btn-close-ai-modal').addEventListener('click', () => {
+        document.getElementById('ai-overlay').style.display = 'none';
+    });
+    document.getElementById('ai-overlay').addEventListener('click', (e) => {
+        if (e.target.id === 'ai-overlay') {
+            document.getElementById('ai-overlay').style.display = 'none';
+        }
+    });
+
+    // Handle AI Level selection
+    document.querySelectorAll('.ai-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const level = card.getAttribute('data-level');
+            document.getElementById('ai-overlay').style.display = 'none';
+            startAI(level);
+        });
+    });
+
     document.getElementById('btn-pass').addEventListener('click', startPass);
 
     // In-game controls
@@ -220,7 +245,11 @@ function joinGame(roomId) {
 /* ============================================================= */
 /*  OFFLINE MODES                                                 */
 /* ============================================================= */
-function startAI()   { APP.mode = 'ai';   startMatch('w'); }
+function startAI(level) {
+    APP.mode = 'ai';
+    APP.aiLevel = level || 'medium';
+    startMatch('w');
+}
 function startPass() { APP.mode = 'pass'; startMatch('w'); }
 
 /* ============================================================= */
@@ -238,9 +267,15 @@ function startMatch(myColor) {
     const isOnline = APP.mode === 'online';
     const isAI     = APP.mode === 'ai';
     const localName = myColor === 'w' ? 'White' : 'Black';
+    
+    let aiLabel = 'AI';
+    if (isAI && APP.aiLevel) {
+        aiLabel = APP.aiLevel.charAt(0).toUpperCase() + APP.aiLevel.slice(1);
+    }
+
     const oppName   = myColor === 'w'
-        ? (isAI ? 'AI Engine' : 'Black')
-        : (isAI ? 'AI Engine' : 'White');
+        ? (isAI ? `AI (${aiLabel})` : 'Black')
+        : (isAI ? `AI (${aiLabel})` : 'White');
 
     document.getElementById('nm-me').textContent  = localName;
     document.getElementById('nm-opp').textContent = oppName;
@@ -248,7 +283,7 @@ function startMatch(myColor) {
     document.getElementById('av-opp').textContent = myColor === 'w' ? 'B' : 'W';
 
     document.getElementById('match-title').textContent =
-        isAI ? 'vs AI Engine' : isOnline ? 'Online Multiplayer' : 'Local Hotseat';
+        isAI ? `vs AI (${aiLabel})` : isOnline ? 'Online Multiplayer' : 'Local Hotseat';
     document.getElementById('match-sub').textContent =
         `${APP.preset.min}m + ${APP.preset.inc}s`;
 
