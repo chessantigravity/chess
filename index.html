@@ -57,7 +57,7 @@
     </div>
 
     <!-- MATCH HISTORY SECTION -->
-    <div class="card" id="match-history-card" style="grid-column: 1 / -1; margin-top: 1rem; text-align: left; display: none;">
+    <div class="card" id="match-history-card" style="grid-column: 1 / -1; margin-top: 1.5rem; text-align: left; display: none;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:1rem;">
             <h2 style="margin:0;"><i class="fa fa-history" style="color:var(--accent);"></i> Match History</h2>
             <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
@@ -346,13 +346,13 @@
                 </div>
 
                 <div style="display:flex; flex-direction:column; align-items:center; gap:1rem; flex:1; justify-content:center;">
-                    <div id="puzzle-board-wrap" data-hint-active="false" style="width:min(320px, 90vw); aspect-ratio:1; background:var(--bg); border:2px solid var(--card-border); border-radius:8px; position:relative; overflow:hidden;">
+                    <div id="puzzle-board-wrap" data-hint-active="false">
                         <!-- Interactive Board squares rendered by puzzle-mode.js -->
                     </div>
 
                     <div id="puzzle-status" style="font-weight:700; font-size:0.88rem; min-height:22px; text-align:center;"></div>
 
-                    <div style="display:flex; gap:0.6rem; width:min(320px,90vw); margin-top:0.25rem;">
+                    <div style="display:flex; gap:0.6rem; width:min(480px, 100%); margin-top:0.25rem;">
                         <button class="btn btn-secondary" id="btn-puzzle-hint" style="flex:1;"><i class="fa fa-lightbulb"></i> Hint (-1 ★)</button>
                         <button class="btn btn-secondary" id="btn-puzzle-reset" style="flex:1;"><i class="fa fa-undo"></i> Reset</button>
                     </div>

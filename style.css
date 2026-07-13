@@ -126,7 +126,7 @@ body {
 .lobby-hero h1 { font-size: clamp(1.8rem, 4vw, 3rem); font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 .lobby-hero p { color: var(--text2); margin-top: 0.5rem; }
 
-.lobby-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
+.lobby-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
 
 /* ---------- CARD ---------- */
 .card {
@@ -980,6 +980,26 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    padding: 1.5rem;
+    box-sizing: border-box;
+}
+.puzzle-main #active-puzzle-card {
+    flex: 1;
+    min-height: 0;
+    display: none;
+    flex-direction: column;
+}
+#puzzle-board-wrap {
+    width: min(100%, calc(100vh - 280px));
+    aspect-ratio: 1;
+    max-width: 480px;
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid var(--card-border);
+    background: var(--bg);
+    flex-shrink: 0;
+    align-self: center;
 }
 .map-level-node {
     position: absolute;
