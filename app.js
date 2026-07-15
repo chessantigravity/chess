@@ -3,6 +3,8 @@
    Handles UI, routing, timers, lobbying, chat
    ============================================================= */
 
+import { SettingsService } from './settings-service.js';
+
 /* Global app state accessible by game.js and network.js */
 window.APP = {
     mode:          'ai',          // 'ai' | 'pass' | 'online'
@@ -22,6 +24,9 @@ window.APP = {
 /*  BOOT                                                          */
 /* ============================================================= */
 document.addEventListener('DOMContentLoaded', () => {
+
+    // Apply saved settings immediately (themes, colors, animation speed)
+    SettingsService.init();
 
     // Auto-join from URL ?room=ID
     const params    = new URLSearchParams(window.location.search);
@@ -131,6 +136,182 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     });
+
+    /* ─────────────────────────────────────────────────────────────
+       SETTINGS SCREEN
+       ───────────────────────────────────────────────────────────── */
+    const settingsScreen = document.getElementById('settings-screen');
+    const lobbyScreen    = document.getElementById('lobby');
+
+    // Helper: hide all screens and show settings
+    function openSettings() {
+        document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+        settingsScreen.style.display = 'block';
+        buildSettingsUI();
+    }
+    function closeSettings(returnTo) {
+        settingsScreen.style.display = 'none';
+        if (returnTo) returnTo.style.display = 'block';
+        else lobbyScreen.style.display = 'block';
+    }
+
+    document.getElementById('btn-open-settings').addEventListener('click', () => {
+        // Remember which screen was active so we can return to it
+        const prev = [...document.querySelectorAll('.screen')].find(s => s.style.display === 'block' && s.id !== 'settings-screen');
+        openSettings();
+        document.getElementById('btn-settings-back').onclick = () => closeSettings(prev);
+    });
+
+    /* "Saved" flash badge */
+    let _savedTimer;
+    function flashSaved() {
+        const badge = document.getElementById('settings-saved-badge');
+        if (!badge) return;
+        badge.classList.add('show');
+        clearTimeout(_savedTimer);
+        _savedTimer = setTimeout(() => badge.classList.remove('show'), 1800);
+    }
+    window.addEventListener('settings-changed', flashSaved);
+
+    /* ─── Build Settings UI ──────────────────────────────────── */
+    function buildSettingsUI() {
+        const s = SettingsService.getAll();
+
+        /* --- Board theme swatches --- */
+        const BOARD_THEMES = [
+            { id:'mono',   label:'Mono',   light:'#eeeed2', dark:'#769656' },
+            { id:'wood',   label:'Wood',   light:'#f0d9b5', dark:'#b58863' },
+            { id:'green',  label:'Green',  light:'#f0d9b5', dark:'#829769' },
+            { id:'ocean',  label:'Ocean',  light:'#dee3e8', dark:'#5c7a96' },
+            { id:'purple', label:'Purple', light:'#e8d8f8', dark:'#7c4a9e' },
+            { id:'ice',    label:'Ice',    light:'#f0f0f0', dark:'#6090b8' },
+        ];
+        const swatchesEl = document.getElementById('board-theme-swatches');
+        swatchesEl.innerHTML = BOARD_THEMES.map(t => `
+            <button class="theme-swatch${s.boardTheme === t.id ? ' active' : ''}" data-val="${t.id}" title="${t.label}" style="border:none;background:none;padding:0;">
+                <div class="theme-swatch-board">
+                    <span style="background:${t.dark}"></span>
+                    <span style="background:${t.light}"></span>
+                    <span style="background:${t.light}"></span>
+                    <span style="background:${t.dark}"></span>
+                </div>
+                <div class="theme-swatch-label">${t.label}</div>
+            </button>
+        `).join('');
+        swatchesEl.querySelectorAll('.theme-swatch').forEach(btn => {
+            btn.addEventListener('click', () => {
+                swatchesEl.querySelectorAll('.theme-swatch').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                SettingsService.set('boardTheme', btn.dataset.val);
+            });
+        });
+
+        /* --- Piece theme cards --- */
+        const PIECE_THEMES = [
+            { id:'standard', label:'Standard', preview:'♞' },
+            { id:'classic',  label:'Classic',  preview:'♜' },
+            { id:'minimal',  label:'Minimal',  preview:'♟' },
+        ];
+        const pieceEl = document.getElementById('piece-theme-cards');
+        pieceEl.innerHTML = PIECE_THEMES.map(t => `
+            <button class="piece-theme-card${s.pieceTheme === t.id ? ' active' : ''}" data-val="${t.id}" style="border:none;cursor:pointer;">
+                <span class="piece-preview">${t.preview}</span>
+                <span class="piece-name">${t.label}</span>
+            </button>
+        `).join('');
+        pieceEl.querySelectorAll('.piece-theme-card').forEach(btn => {
+            btn.addEventListener('click', () => {
+                pieceEl.querySelectorAll('.piece-theme-card').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                SettingsService.set('pieceTheme', btn.dataset.val);
+            });
+        });
+
+        /* --- Highlight color swatches --- */
+        const HIGHLIGHT_COLORS = ['#baca2b','#f7f785','#7bcf52','#4a90d9','#e05252','#f59e0b','#ec4899','#ffffff'];
+        const LASTMOVE_COLORS  = ['#f7f785','#baca2b','#90e0c0','#a8d8f0','#f0c0a8','#d0b0f0','#f0d0a8','#e0e0e0'];
+
+        function buildColorSwatches(containerId, colors, settingKey) {
+            const el = document.getElementById(containerId);
+            const cur = s[settingKey];
+            el.innerHTML = colors.map(c => `
+                <button class="color-swatch${c.toLowerCase() === cur.toLowerCase() ? ' active' : ''}"
+                    data-val="${c}" title="${c}"
+                    style="background:${c}; border:none; cursor:pointer;">
+                </button>
+            `).join('') + `
+                <label title="Custom color" style="cursor:pointer;">
+                    <input type="color" value="${cur}" style="width:0;height:0;opacity:0;position:absolute;" class="custom-color-inp" data-key="${settingKey}">
+                    <span style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#ff6b6b,#ffd93d,#6bcb77,#4d96ff);display:inline-block;border:2px solid var(--card-border);cursor:pointer;"></span>
+                </label>
+            `;
+            el.querySelectorAll('.color-swatch').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    el.querySelectorAll('.color-swatch').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    SettingsService.set(settingKey, btn.dataset.val);
+                });
+            });
+            el.querySelector('.custom-color-inp').addEventListener('input', (e) => {
+                el.querySelectorAll('.color-swatch').forEach(b => b.classList.remove('active'));
+                SettingsService.set(settingKey, e.target.value);
+            });
+        }
+        buildColorSwatches('highlight-swatches', HIGHLIGHT_COLORS, 'highlightColor');
+        buildColorSwatches('lastmove-swatches',  LASTMOVE_COLORS,  'lastMoveColor');
+
+        /* --- Animation speed pills --- */
+        buildPillGroup('animation-speed-pills', s.animationSpeed, 'animationSpeed');
+
+        /* --- Audio toggles & sliders --- */
+        const toggleSounds = document.getElementById('toggle-sounds');
+        const sliderSoundVol = document.getElementById('slider-sound-vol');
+        const labelSoundVol  = document.getElementById('label-sound-vol');
+        toggleSounds.checked = s.sounds;
+        sliderSoundVol.value = s.soundVolume;
+        labelSoundVol.textContent = s.soundVolume + '%';
+        toggleSounds.addEventListener('change', () => SettingsService.set('sounds', toggleSounds.checked));
+        sliderSoundVol.addEventListener('input', () => {
+            labelSoundVol.textContent = sliderSoundVol.value + '%';
+            SettingsService.set('soundVolume', +sliderSoundVol.value);
+        });
+
+        const toggleMusic = document.getElementById('toggle-music');
+        const sliderMusicVol = document.getElementById('slider-music-vol');
+        const labelMusicVol  = document.getElementById('label-music-vol');
+        toggleMusic.checked = s.music;
+        sliderMusicVol.value = s.musicVolume;
+        labelMusicVol.textContent = s.musicVolume + '%';
+        toggleMusic.addEventListener('change', () => SettingsService.set('music', toggleMusic.checked));
+        sliderMusicVol.addEventListener('input', () => {
+            labelMusicVol.textContent = sliderMusicVol.value + '%';
+            SettingsService.set('musicVolume', +sliderMusicVol.value);
+        });
+
+        /* --- AI difficulty pills --- */
+        buildPillGroup('ai-difficulty-pills', s.aiDifficulty, 'aiDifficulty');
+
+        /* --- Reset button --- */
+        document.getElementById('btn-settings-reset').onclick = () => {
+            if (!confirm('Reset all settings to defaults?')) return;
+            SettingsService.reset();
+            buildSettingsUI(); // Re-render UI with defaults
+        };
+    }
+
+    /* Helper: wire a pill group to a settings key */
+    function buildPillGroup(containerId, currentVal, settingKey) {
+        const el = document.getElementById(containerId);
+        if (!el) return;
+        el.querySelectorAll('.option-pill').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.val === currentVal);
+            btn.addEventListener('click', () => {
+                el.querySelectorAll('.option-pill').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                SettingsService.set(settingKey, btn.dataset.val);
+            });
+        });
+    }
 
     // In-game controls
     document.getElementById('btn-resign').addEventListener('click', () => {

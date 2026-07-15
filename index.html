@@ -35,6 +35,9 @@
             <button class="pill active" id="pill-mono" onclick="setTheme('mono')">Mono</button>
             <button class="pill" id="pill-wood" onclick="setTheme('wood')">Wood</button>
         </div>
+        <button class="btn btn-secondary btn-sm" id="btn-open-settings" title="Settings" style="padding:0.4rem 0.65rem; font-size:0.9rem;">
+            <i class="fa fa-gear"></i>
+        </button>
         <div class="net-badge" id="net-badge">
             <span class="dot" id="net-dot"></span>
             <span id="net-status">Connecting…</span>
@@ -449,6 +452,225 @@
                     <div style="height:8px; border-radius:99px; background:var(--bg); overflow:hidden;">
                         <div id="ppage-winrate-bar" style="height:100%; border-radius:99px; background:linear-gradient(90deg,#3b82f6,#1d4ed8); width:0%; transition:width 0.8s;"></div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</section>
+
+<!-- ============ SETTINGS SCREEN ============ -->
+<section id="settings-screen" class="screen">
+    <div class="settings-inner">
+
+        <!-- Page header row -->
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <h1 style="font-size:1.5rem; font-weight:900; display:flex; align-items:center; gap:0.6rem;">
+                    <i class="fa fa-gear" style="color:var(--accent);"></i> Settings
+                </h1>
+                <p style="color:var(--text2); font-size:0.82rem; margin-top:0.2rem;">All changes save automatically</p>
+            </div>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+                <span class="settings-saved-badge" id="settings-saved-badge"><i class="fa fa-check-circle"></i> Saved</span>
+                <button class="btn btn-secondary" id="btn-settings-back" style="display:flex; align-items:center; gap:0.5rem;">
+                    <i class="fa fa-arrow-left"></i> Back
+                </button>
+            </div>
+        </div>
+
+        <!-- ── BOARD & APPEARANCE ──────────────────────────────── -->
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <i class="fa fa-chess-board"></i> Board &amp; Appearance
+            </div>
+
+            <!-- Board Theme -->
+            <div class="settings-row">
+                <div class="settings-row-label">
+                    <strong>Board Theme</strong>
+                    <span>Choose the color scheme for the chess board</span>
+                </div>
+                <div class="settings-row-control">
+                    <div class="theme-swatches" id="board-theme-swatches">
+                        <!-- Dynamically built by settings-ui.js -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Piece Theme -->
+            <div class="settings-row">
+                <div class="settings-row-label">
+                    <strong>Piece Style</strong>
+                    <span>Visual style for chess pieces</span>
+                </div>
+                <div class="settings-row-control">
+                    <div class="piece-themes" id="piece-theme-cards">
+                        <!-- Dynamically built by settings-ui.js -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── HIGHLIGHTS ─────────────────────────────────────── -->
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <i class="fa fa-paint-brush"></i> Highlights
+            </div>
+
+            <!-- Selected Square Color -->
+            <div class="settings-row">
+                <div class="settings-row-label">
+                    <strong>Selection Color</strong>
+                    <span>Color when you click a piece</span>
+                </div>
+                <div class="settings-row-control">
+                    <div class="color-swatches" id="highlight-swatches"></div>
+                </div>
+            </div>
+
+            <!-- Last Move Color -->
+            <div class="settings-row">
+                <div class="settings-row-label">
+                    <strong>Last Move Color</strong>
+                    <span>Highlight color for the previous move</span>
+                </div>
+                <div class="settings-row-control">
+                    <div class="color-swatches" id="lastmove-swatches"></div>
+                </div>
+            </div>
+
+            <!-- Animation Speed -->
+            <div class="settings-row">
+                <div class="settings-row-label">
+                    <strong>Animation Speed</strong>
+                    <span>How fast pieces move across the board</span>
+                </div>
+                <div class="settings-row-control">
+                    <div class="option-pills" id="animation-speed-pills">
+                        <button class="option-pill" data-val="none">Off</button>
+                        <button class="option-pill" data-val="fast">Fast</button>
+                        <button class="option-pill" data-val="normal">Normal</button>
+                        <button class="option-pill" data-val="slow">Slow</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── AUDIO ──────────────────────────────────────────── -->
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <i class="fa fa-volume-high"></i> Audio
+            </div>
+
+            <!-- Sound Effects -->
+            <div class="settings-row">
+                <div class="settings-row-label">
+                    <strong>Sound Effects</strong>
+                    <span>Move sounds, captures, check alerts</span>
+                </div>
+                <div class="settings-row-control">
+                    <div class="toggle-wrap">
+                        <label class="toggle" title="Sound Effects">
+                            <input type="checkbox" id="toggle-sounds">
+                            <span class="toggle-track"></span>
+                            <span class="toggle-thumb"></span>
+                        </label>
+                        <div class="volume-wrap">
+                            <i class="fa fa-volume-low volume-icon"></i>
+                            <input type="range" class="volume-slider" id="slider-sound-vol" min="0" max="100" value="80">
+                            <span class="volume-pct" id="label-sound-vol">80%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Background Music -->
+            <div class="settings-row">
+                <div class="settings-row-label">
+                    <strong>Background Music</strong>
+                    <span>Ambient music while you play</span>
+                </div>
+                <div class="settings-row-control">
+                    <div class="toggle-wrap">
+                        <label class="toggle" title="Background Music">
+                            <input type="checkbox" id="toggle-music">
+                            <span class="toggle-track"></span>
+                            <span class="toggle-thumb"></span>
+                        </label>
+                        <div class="volume-wrap">
+                            <i class="fa fa-music volume-icon"></i>
+                            <input type="range" class="volume-slider" id="slider-music-vol" min="0" max="100" value="40">
+                            <span class="volume-pct" id="label-music-vol">40%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── GAMEPLAY ───────────────────────────────────────── -->
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <i class="fa fa-robot"></i> Gameplay
+            </div>
+
+            <!-- Default AI Difficulty -->
+            <div class="settings-row">
+                <div class="settings-row-label">
+                    <strong>Default AI Difficulty</strong>
+                    <span>Pre-selected level when starting vs AI</span>
+                </div>
+                <div class="settings-row-control">
+                    <div class="option-pills" id="ai-difficulty-pills">
+                        <button class="option-pill" data-val="easy">Easy</button>
+                        <button class="option-pill" data-val="medium">Medium</button>
+                        <button class="option-pill" data-val="hard">Hard</button>
+                        <button class="option-pill" data-val="expert">Expert</button>
+                        <button class="option-pill" data-val="master">Master</button>
+                        <button class="option-pill" data-val="grandmaster">GM</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── LANGUAGE ───────────────────────────────────────── -->
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <i class="fa fa-globe"></i> Language
+                <span class="tag-future">Coming Soon</span>
+            </div>
+            <div class="settings-row">
+                <div class="settings-row-label">
+                    <strong>Interface Language</strong>
+                    <span>Change the language of the app</span>
+                </div>
+                <div class="settings-row-control">
+                    <div class="option-pills" id="language-pills">
+                        <button class="option-pill active" data-val="en">🇬🇧 English</button>
+                        <button class="option-pill" data-val="es" disabled>🇪🇸 Español</button>
+                        <button class="option-pill" data-val="fr" disabled>🇫🇷 Français</button>
+                        <button class="option-pill" data-val="de" disabled>🇩🇪 Deutsch</button>
+                        <button class="option-pill" data-val="ar" disabled>🇸🇦 Arabic</button>
+                        <button class="option-pill" data-val="hi" disabled>🇮🇳 Hindi</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── RESET ──────────────────────────────────────────── -->
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <i class="fa fa-rotate-left"></i> Reset
+            </div>
+            <div class="settings-row">
+                <div class="settings-row-label">
+                    <strong>Reset All Settings</strong>
+                    <span>Restore all preferences to their default values</span>
+                </div>
+                <div class="settings-row-control">
+                    <button class="btn btn-secondary" id="btn-settings-reset" style="color:var(--danger); border-color:var(--danger);">
+                        <i class="fa fa-trash-alt"></i> Reset to Defaults
+                    </button>
                 </div>
             </div>
         </div>
