@@ -29,6 +29,12 @@ html { font-size: 16px; }
     --sq-hint:     rgba(0, 0, 0, 0.15);
     --board-border:#1a1a1a;
     --clock-active:#81b64c;
+--shadow-sm: 0 1px 3px rgba(0,0,0,0.12);
+--shadow-md: 0 4px 6px rgba(0,0,0,0.15);
+--shadow-lg: 0 10px 20px rgba(0,0,0,0.2);
+--btn-radius: 10px;
+--transition-fast: 0.2s;
+--transition-medium: 0.3s;
 }
 [data-theme="wood"] {
     --bg:          #1a120a;
@@ -208,8 +214,9 @@ body {
 }
 
 /* ---------- SCREENS ---------- */
-.screen { display: none; height: 100%; }
-.screen.active { display: block; }
+.screen { display: none; height: 100%; opacity: 0; transition: opacity 0.25s ease, transform 0.25s ease; transform: translateY(10px); }
+.screen.active { display: block; opacity: 1; transform: translateY(0); }
+
 
 /* ---------- LOBBY ---------- */
 /* Lobby can scroll since it's not the game screen */
@@ -222,6 +229,20 @@ body {
 
 /* ---------- CARD ---------- */
 .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: var(--btn-radius);
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    box-shadow: var(--shadow-md);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
     background: var(--card);
     border: 1px solid var(--card-border);
     border-radius: 16px;
@@ -1235,10 +1256,12 @@ body {
    SETTINGS PAGE
    ===================================================== */
 #settings-screen {
-    display: none;
     overflow-y: auto;
     max-height: calc(100vh - 52px);
     padding-bottom: 3rem;
+}
+#settings-screen.active {
+    display: block !important;  /* override .screen base; settings needs block not flex/grid */
 }
 .settings-inner {
     max-width: 780px;
