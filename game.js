@@ -861,10 +861,30 @@ const ChessGame = (() => {
         try {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const t = audioCtx.currentTime;
+
+            if (type === 'unlock') {
+                // Synthesize C-major arpeggio: C4, E4, G4, C5
+                const freqs = [261.63, 329.63, 392.00, 523.25];
+                freqs.forEach((f, idx) => {
+                    const noteTime = t + idx * 0.08;
+                    const oscNode = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    oscNode.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    oscNode.frequency.setValueAtTime(f, noteTime);
+                    gainNode.gain.setValueAtTime(0.12, noteTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, noteTime + 0.35);
+                    oscNode.start(noteTime);
+                    oscNode.stop(noteTime + 0.35);
+                });
+                return;
+            }
+
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.connect(gain); gain.connect(audioCtx.destination);
-            const t = audioCtx.currentTime;
             if (type === 'move') {
                 osc.frequency.setValueAtTime(220, t);
                 osc.frequency.exponentialRampToValueAtTime(130, t+0.1);
@@ -887,6 +907,19 @@ const ChessGame = (() => {
             }
         } catch(e) { /* audio blocked */ }
     }
+    
+    // Export globally for modules
+    window.playAudio = playSFX;
+    Object.defineProperty(window, 'soundEnabled', {
+        get: () => {
+            try {
+                return window.SettingsService ? window.SettingsService.get('sounds') : true;
+            } catch(e) {
+                return true;
+            }
+        },
+        configurable: true
+    });
 
     /* ---------- Expose for app.js / network.js ---------- */
     return {

@@ -358,7 +358,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 { val: profile.favoriteOpening || 'None',   lbl: 'Opening',     color: '',        small: true },
                 { val: '⭐ ' + totalStars,                  lbl: 'Puzzle ★',   color: '#fbbf24' },
                 { val: lessons,                             lbl: 'Lessons',     color: '' },
-                { val: achievementsCount + '/5',            lbl: 'Trophies',    color: '' },
+                { val: achievementsCount + '/10',           lbl: 'Trophies',    color: '' },
             ];
 
             document.getElementById('ppage-stats-grid').innerHTML = stats.map(s => `
@@ -367,6 +367,64 @@ document.addEventListener("DOMContentLoaded", () => {
                     <span class="profile-stat-lbl">${s.lbl}</span>
                 </div>
             `).join('');
+
+            // Render achievements list
+            const achievementsList = document.getElementById('ppage-achievements-list');
+            if (achievementsList) {
+                const list = DbService.getAchievementsList();
+                const unlockedSet = new Set(profile.achievements || []);
+                achievementsList.innerHTML = list.map(ach => {
+                    const isUnlocked = unlockedSet.has(ach.id);
+                    
+                    let currentVal = 0;
+                    let targetVal = 1;
+                    let showProgress = false;
+                    
+                    if (ach.id === "win_10_games") {
+                        currentVal = profile.wins || 0;
+                        targetVal = 10;
+                        showProgress = true;
+                    } else if (ach.id === "play_100_games") {
+                        currentVal = profile.gamesPlayed || 0;
+                        targetVal = 100;
+                        showProgress = true;
+                    } else if (ach.id === "solve_10_puzzles") {
+                        currentVal = Object.keys(profile.puzzleStars || {}).length;
+                        targetVal = 10;
+                        showProgress = true;
+                    } else if (ach.id === "solve_100_puzzles") {
+                        currentVal = Object.keys(profile.puzzleStars || {}).length;
+                        targetVal = 100;
+                        showProgress = true;
+                    } else if (ach.id === "finish_learn_chess") {
+                        currentVal = (profile.completedLessons || []).length;
+                        targetVal = 14;
+                        showProgress = true;
+                    }
+                    
+                    const pct = Math.min(100, Math.round((currentVal / targetVal) * 100));
+                    
+                    return `
+                        <div style="display:flex; align-items:center; gap:0.85rem; padding:0.75rem; border-radius:8px; background:${isUnlocked ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)'}; border:1px solid ${isUnlocked ? 'var(--card-border)' : 'rgba(255,255,255,0.03)'}; opacity:${isUnlocked ? 1 : 0.6}; transition: all 0.3s ease;">
+                            <div style="font-size:1.75rem; display:flex; align-items:center; justify-content:center; width:44px; height:44px; border-radius:50%; background:${isUnlocked ? 'rgba(251,191,36,0.1)' : 'rgba(255,255,255,0.05)'}; border:1px solid ${isUnlocked ? '#fbbf24' : 'transparent'}; flex-shrink:0;">
+                                ${isUnlocked ? '🏆' : '🔒'}
+                            </div>
+                            <div style="flex:1; min-width:0;">
+                                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.15rem;">
+                                    <span style="font-size:0.9rem; font-weight:700; color:${isUnlocked ? 'var(--text)' : 'var(--text2)'};">${ach.title}</span>
+                                    ${showProgress && !isUnlocked ? `<span style="font-size:0.7rem; color:var(--text2); font-weight:600;">${currentVal}/${targetVal}</span>` : ''}
+                                </div>
+                                <div style="font-size:0.75rem; color:var(--text2); text-overflow:ellipsis; overflow:hidden; white-space:nowrap; margin-bottom:0.25rem;">${ach.desc}</div>
+                                ${showProgress && !isUnlocked ? `
+                                    <div style="height:4px; border-radius:99px; background:rgba(255,255,255,0.05); overflow:hidden; width:100%;">
+                                        <div style="height:100%; border-radius:99px; background:var(--accent); width:${pct}%;"></div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
 
             // Progress bars (animate after small delay)
             setTimeout(() => {

@@ -621,6 +621,43 @@ function toast(msg) {
 }
 
 /* ============================================================= */
+/*  ACHIEVEMENT UNLOCKED NOTIFICATION ANIMATION                  */
+/* ============================================================= */
+function showAchievementUnlock(title, desc) {
+    // Play celebratory unlock sound arpeggio
+    if (window.playAudio && window.soundEnabled) {
+        window.playAudio("unlock");
+    }
+
+    // Create the floating achievement banner element dynamically
+    const banner = document.createElement("div");
+    banner.className = "achievement-banner";
+    banner.innerHTML = `
+        <div class="achievement-banner-trophy">🏆</div>
+        <div style="flex:1; min-width:0;">
+            <div style="font-size:0.62rem; font-weight:800; color:#fbbf24; text-transform:uppercase; letter-spacing:0.12em; margin-bottom:0.1rem;">ACHIEVEMENT UNLOCKED</div>
+            <div style="font-size:0.85rem; font-weight:800; color:#fff; margin-bottom:0.1rem; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${title}</div>
+            <div style="font-size:0.72rem; color:var(--text2); line-height:1.2; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${desc}</div>
+        </div>
+    `;
+
+    document.body.appendChild(banner);
+
+    // Slide in
+    setTimeout(() => {
+        banner.classList.add("show");
+    }, 100);
+
+    // Slide out and destroy after 4.5 seconds
+    setTimeout(() => {
+        banner.classList.remove("show");
+        setTimeout(() => {
+            banner.remove();
+        }, 600);
+    }, 4500);
+}
+
+/* ============================================================= */
 /*  GLOBAL EXPORTS — needed by inline HTML handlers & plain       */
 /*  scripts (game.js, network.js) that run outside module scope   */
 /* ============================================================= */
@@ -628,5 +665,6 @@ window.setTheme  = setTheme;
 window.copyLink  = copyLink;
 window.switchTab = switchTab;
 window.toast     = toast;
+window.showAchievementUnlock = showAchievementUnlock;
 window.startMatch= startMatch;
 

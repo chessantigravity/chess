@@ -129,50 +129,80 @@ export const DbService = {
         return updates;
     },
 
-    // Update Puzzle Progress
-    async incrementPuzzlesSolved(uid) {
+    // Update Puzzle Progress & check achievements
+    async updatePuzzleProgress(uid, unlockedLevel, puzzleStars) {
         if (!uid) return;
         const profile = await this.getUserProfile(uid);
         if (!profile) return;
-        const newCount = (profile.puzzleProgress || 0) + 1;
-        await this.updateUserProfile(uid, { puzzleProgress: newCount });
-        return newCount;
+        const updates = {
+            puzzleProgress: unlockedLevel,
+            puzzleStars: puzzleStars
+        };
+        await this.updateUserProfile(uid, updates);
+        await this.checkAchievements(uid, { ...profile, ...updates });
     },
 
-    // Update Learning Progress
-    async incrementLessonsCompleted(uid) {
+    // Update Learning Progress & check achievements
+    async incrementLearningProgress(uid, completedLessonsList) {
         if (!uid) return;
         const profile = await this.getUserProfile(uid);
         if (!profile) return;
         const newCount = (profile.learningProgress || 0) + 1;
-        await this.updateUserProfile(uid, { learningProgress: newCount });
+        const updates = {
+            learningProgress: newCount,
+            completedLessons: completedLessonsList
+        };
+        await this.updateUserProfile(uid, updates);
+        await this.checkAchievements(uid, { ...profile, ...updates });
         return newCount;
+    },
+
+    // List of all achievements in system
+    getAchievementsList() {
+        return [
+            { id: "first_win", title: "First Win", desc: "Win your first chess game", check: (s) => (s.wins || 0) >= 1 },
+            { id: "win_10_games", title: "Win 10 Games", desc: "Win 10 games", check: (s) => (s.wins || 0) >= 10 },
+            { id: "defeat_easy_ai", title: "Beat Easy AI", desc: "Defeat Easy AI level", check: (s) => {
+                const rankOrder = { "Easy": 1, "Medium": 2, "Hard": 3, "Expert": 4, "Master": 5, "Grandmaster": 6 };
+                return (rankOrder[s.highestAIDefeated || "None"] || 0) >= 1;
+            }},
+            { id: "defeat_medium_ai", title: "Beat Medium AI", desc: "Defeat Medium AI level", check: (s) => {
+                const rankOrder = { "Easy": 1, "Medium": 2, "Hard": 3, "Expert": 4, "Master": 5, "Grandmaster": 6 };
+                return (rankOrder[s.highestAIDefeated || "None"] || 0) >= 2;
+            }},
+            { id: "defeat_hard_ai", title: "Beat Hard AI", desc: "Defeat Hard AI level", check: (s) => {
+                const rankOrder = { "Easy": 1, "Medium": 2, "Hard": 3, "Expert": 4, "Master": 5, "Grandmaster": 6 };
+                return (rankOrder[s.highestAIDefeated || "None"] || 0) >= 3;
+            }},
+            { id: "defeat_grandmaster_ai", title: "Beat Grandmaster AI", desc: "Defeat Grandmaster AI level", check: (s) => {
+                const rankOrder = { "Easy": 1, "Medium": 2, "Hard": 3, "Expert": 4, "Master": 5, "Grandmaster": 6 };
+                return (rankOrder[s.highestAIDefeated || "None"] || 0) >= 6;
+            }},
+            { id: "solve_10_puzzles", title: "Solve 10 Puzzles", desc: "Solve 10 puzzles in Quest", check: (s) => Object.keys(s.puzzleStars || {}).length >= 10 },
+            { id: "solve_100_puzzles", title: "Solve 100 Puzzles", desc: "Solve 100 puzzles in Quest", check: (s) => Object.keys(s.puzzleStars || {}).length >= 100 },
+            { id: "finish_learn_chess", title: "Finish Learn Chess", desc: "Finish Chess Academy syllabus", check: (s) => (s.completedLessons || []).length >= 14 },
+            { id: "play_100_games", title: "Play 100 Games", desc: "Play 100 chess games", check: (s) => (s.gamesPlayed || 0) >= 100 }
+        ];
     },
 
     // Achievement checklist evaluator
     async checkAchievements(uid, stats) {
         const activeAchievements = stats.achievements || [];
         const newAchievements = [...activeAchievements];
-
-        const checklist = [
-            { id: "first_game", title: "First Steps", desc: "Play your first match", check: (s) => s.gamesPlayed >= 1 },
-            { id: "ten_games", title: "Veteran Player", desc: "Play 10 matches", check: (s) => s.gamesPlayed >= 10 },
-            { id: "first_win", title: "Victor!", desc: "Win your first chess game", check: (s) => s.wins >= 1 },
-            { id: "defeat_easy_ai", title: "AI Apprentice", desc: "Defeat Easy AI", check: (s) => s.highestAIDefeated !== "None" },
-            { id: "defeat_expert_ai", title: "Tactical Master", desc: "Defeat Expert AI or above", check: (s) => {
-                const rankOrder = { "Easy": 1, "Medium": 2, "Hard": 3, "Expert": 4, "Master": 5, "Grandmaster": 6 };
-                return rankOrder[s.highestAIDefeated] >= 4;
-            }}
-        ];
+        const checklist = this.getAchievementsList();
 
         let changed = false;
         for (const item of checklist) {
             if (!activeAchievements.includes(item.id) && item.check(stats)) {
                 newAchievements.push(item.id);
                 changed = true;
-                // Toast notification
+                // Animate achievement unlock toast
                 setTimeout(() => {
-                    if (window.toast) window.toast(`🏆 Achievement Unlocked: ${item.title}!`);
+                    if (window.showAchievementUnlock) {
+                        window.showAchievementUnlock(item.title, item.desc);
+                    } else if (window.toast) {
+                        window.toast(`🏆 Achievement Unlocked: ${item.title}!`);
+                    }
                 }, 1000);
             }
         }

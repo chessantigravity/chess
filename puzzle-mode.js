@@ -86,10 +86,7 @@ async function saveProgress(levelCompleted, starsEarned) {
         localStorage.setItem("mock_puzzle_stars", JSON.stringify(puzzleStars));
     } else {
         try {
-            await DbService.updateUserProfile(currentUser.uid, {
-                puzzleProgress: unlockedLevel,
-                puzzleStars: puzzleStars
-            });
+            await DbService.updatePuzzleProgress(currentUser.uid, unlockedLevel, puzzleStars);
         } catch (e) {
             console.error("Failed to save puzzle progress:", e);
         }

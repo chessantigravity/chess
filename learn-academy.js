@@ -835,10 +835,8 @@ async function finishActiveLesson() {
         completedLessonsList.push(lesson.id);
         
         if (currentUser) {
-            // Save lesson completion list to Firestore
-            await DbService.updateUserProfile(currentUser.uid, { completedLessons: completedLessonsList });
-            // Increment progress counter count
-            await DbService.incrementLearningProgress(currentUser.uid);
+            // Save progress, increment count, and auto-check achievements
+            await DbService.incrementLearningProgress(currentUser.uid, completedLessonsList);
         }
     }
 
