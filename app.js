@@ -3,7 +3,7 @@
    Handles UI, routing, timers, lobbying, chat
    ============================================================= */
 
-import { SettingsService } from './settings-service.js';
+
 
 /* Global app state accessible by game.js and network.js */
 window.APP = {
@@ -145,19 +145,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Helper: hide all screens and show settings
     function openSettings() {
-        document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
-        settingsScreen.style.display = 'block';
+        // Hide all screens by removing active class
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        // Show settings screen
+        settingsScreen.classList.add('active');
         buildSettingsUI();
     }
     function closeSettings(returnTo) {
-        settingsScreen.style.display = 'none';
-        if (returnTo) returnTo.style.display = 'block';
-        else lobbyScreen.style.display = 'block';
+        settingsScreen.classList.remove('active');
+        if (returnTo) returnTo.classList.add('active');
+        else lobbyScreen.classList.add('active');
     }
 
     document.getElementById('btn-open-settings').addEventListener('click', () => {
         // Remember which screen was active so we can return to it
-        const prev = [...document.querySelectorAll('.screen')].find(s => s.style.display === 'block' && s.id !== 'settings-screen');
+        const prev = [...document.querySelectorAll('.screen')].find(s => s.classList.contains('active') && s.id !== 'settings-screen');
         openSettings();
         document.getElementById('btn-settings-back').onclick = () => closeSettings(prev);
     });

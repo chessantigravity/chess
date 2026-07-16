@@ -3,7 +3,7 @@
    All settings persist to localStorage and apply as CSS vars
    ============================================================= */
 
-export const SettingsService = {
+const SettingsService = window.SettingsService = {
 
     /* ─── Defaults ──────────────────────────────────────────── */
     defaults: {
