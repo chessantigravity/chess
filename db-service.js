@@ -13,7 +13,10 @@ import {
     query,
     where,
     orderBy,
-    getDocs
+    getDocs,
+    addDoc,
+    deleteDoc,
+    onSnapshot
 } from "./firebase-init.js";
 
 export const DbService = {
@@ -45,6 +48,7 @@ export const DbService = {
             winPercentage: 0,
             highestAIDefeated: "None",
             favoriteOpening: "None", // Future support
+            rating: 1200,            // ELO rating (starts at 1200)
             puzzleProgress: 1,       // Highest unlocked puzzle level (starts at 1)
             puzzleStars: {},          // { levelId: starCount } e.g. { 1: 3, 2: 2 }
             learningProgress: 0,
@@ -77,7 +81,7 @@ export const DbService = {
     },
 
     // Record game result stats
-    async recordGameResult(uid, outcome, opponentName) {
+    async recordGameResult(uid, outcome, opponentName, opponentRating = null) {
         if (!uid) return;
         const profile = await this.getUserProfile(uid);
         if (!profile) return;
@@ -104,6 +108,15 @@ export const DbService = {
             draws,
             winPercentage
         };
+
+        let rating = profile.rating || 1200;
+        if (opponentRating !== null) {
+            const K = 32;
+            const score = outcome === "win" ? 1 : (outcome === "loss" ? 0 : 0.5);
+            const expected = 1 / (1 + Math.pow(10, (opponentRating - rating) / 400));
+            rating = Math.round(rating + K * (score - expected));
+            updates.rating = rating;
+        }
 
         // Check if defeated AI
         if (outcome === "win" && opponentName && opponentName.startsWith("AI (")) {
@@ -304,6 +317,85 @@ export const DbService = {
         if (firstMove === "c4") return "English Opening";
         
         return "Custom Opening";
+    },
+
+    // Create an online private match room mapping Code -> hostPeerId
+    async createOnlineRoom(roomCode, hostPeerId, hostUid, hostUsername, hostRating, mins, inc) {
+        const docRef = doc(db, "online_rooms", roomCode);
+        const data = {
+            roomCode,
+            hostPeerId,
+            hostUid,
+            hostUsername,
+            hostRating,
+            mins,
+            inc,
+            status: "waiting",
+            timestamp: Date.now()
+        };
+        await setDoc(docRef, data);
+        return data;
+    },
+
+    // Fetch details of online room
+    async getOnlineRoom(roomCode) {
+        const docRef = doc(db, "online_rooms", roomCode);
+        const snapshot = await getDoc(docRef);
+        return snapshot.exists() ? snapshot.data() : null;
+    },
+
+    // Update online room values (status, guest info)
+    async updateOnlineRoom(roomCode, updates) {
+        const docRef = doc(db, "online_rooms", roomCode);
+        await updateDoc(docRef, updates);
+    },
+
+    // Clean up online room
+    async deleteOnlineRoom(roomCode) {
+        const docRef = doc(db, "online_rooms", roomCode);
+        await deleteDoc(docRef);
+    },
+
+    // Add player to matchmaking queue
+    async joinMatchmakingQueue(uid, peerId, username, rating, mins, inc) {
+        const docRef = doc(db, "matchmaking_queue", uid);
+        const data = {
+            userId: uid,
+            peerId,
+            username,
+            rating,
+            mins,
+            inc,
+            status: "waiting",
+            timestamp: Date.now()
+        };
+        await setDoc(docRef, data);
+        return docRef;
+    },
+
+    // Clean up queue entry
+    async leaveMatchmakingQueue(uid) {
+        const docRef = doc(db, "matchmaking_queue", uid);
+        await deleteDoc(docRef);
+    },
+
+    // Check matchmaking queue for matches
+    async findOpponentInQueue(uid, mins, inc) {
+        const q = query(
+            collection(db, "matchmaking_queue"),
+            where("status", "==", "waiting"),
+            where("mins", "==", mins),
+            where("inc", "==", inc)
+        );
+        const snapshot = await getDocs(q);
+        let found = null;
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.userId !== uid && data.mins === mins && data.inc === inc && !found) {
+                found = data;
+            }
+        });
+        return found;
     }
 };
 

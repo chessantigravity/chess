@@ -80,6 +80,26 @@ const Network = (() => {
                     toast('Opponent connected!');
                     // Send clock preset to guest
                     conn.send({ type: 'clock_sync', min: APP.preset.min, inc: APP.preset.inc });
+                    
+                    // Send handshake to guest
+                    import('./auth-service.js').then(({ AuthService }) => {
+                        const user = AuthService.getCurrentUser();
+                        if (user) {
+                            import('./db-service.js').then(async ({ DbService }) => {
+                                const profile = await DbService.getUserProfile(user.uid);
+                                if (profile && conn) {
+                                    conn.send({
+                                        type: 'handshake',
+                                        username: profile.username,
+                                        rating: profile.rating || 1200,
+                                        avatar: profile.avatar || '👤',
+                                        uid: user.uid
+                                    });
+                                }
+                            });
+                        }
+                    });
+
                     if (onGuest) { onGuest(); onGuest = null; }
                 });
             });
@@ -121,6 +141,26 @@ const Network = (() => {
         conn.on('open', () => {
             connected = true;
             toast('Connected to host!');
+            
+            // Send handshake to host
+            import('./auth-service.js').then(({ AuthService }) => {
+                const user = AuthService.getCurrentUser();
+                if (user) {
+                    import('./db-service.js').then(async ({ DbService }) => {
+                        const profile = await DbService.getUserProfile(user.uid);
+                        if (profile && conn) {
+                            conn.send({
+                                type: 'handshake',
+                                username: profile.username,
+                                rating: profile.rating || 1200,
+                                avatar: profile.avatar || '👤',
+                                uid: user.uid
+                            });
+                        }
+                    });
+                }
+            });
+
             if (onJoinCb) { onJoinCb(); onJoinCb = null; }
         });
     }
@@ -137,6 +177,23 @@ const Network = (() => {
     function handlePacket(pkt) {
         if (!pkt) return;
         switch (pkt.type) {
+
+            case 'handshake':
+                if (window.APP) {
+                    APP.opponentUsername = pkt.username;
+                    APP.opponentRating = pkt.rating || 1200;
+                    APP.opponentUid = pkt.uid;
+                    APP.opponentAvatar = pkt.avatar || '👤';
+                }
+                const oppNameEl = document.getElementById('nm-opp');
+                if (oppNameEl) {
+                    oppNameEl.textContent = `${pkt.username} (${pkt.rating || 1200})`;
+                }
+                const oppAvEl = document.getElementById('av-opp');
+                if (oppAvEl) {
+                    oppAvEl.textContent = pkt.avatar || '👤';
+                }
+                break;
 
             case 'room_full':
                 toast('Room is full!');
@@ -228,6 +285,6 @@ const Network = (() => {
         setStatus('', 'Offline');
     }
 
-    return { init, host, join, send, disconnect };
+    return { init, host, join, send, disconnect, isConnected: () => connected, getOpponentPeerId: () => conn ? conn.peer : null };
 
 })();

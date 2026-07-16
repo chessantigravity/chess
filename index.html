@@ -62,9 +62,9 @@
     <div class="lobby-cards">
         <!-- HOST CARD -->
         <div class="card" id="host-card">
-            <div class="card-icon">🏠</div>
-            <h2>Host a Game</h2>
-            <p>Create a room and share the link with a friend.</p>
+            <div class="card-icon">🌍</div>
+            <h2>Online Match</h2>
+            <p>Join matchmaking or create a private room to invite a friend.</p>
 
             <label class="field-label">Time Control</label>
             <div class="time-presets">
@@ -83,9 +83,14 @@
                 </div>
             </div>
 
-            <button class="btn btn-primary" id="btn-host" style="margin-top:1rem;">
-                <i class="fa fa-server"></i> Create Room &amp; Get Link
-            </button>
+            <div style="display:flex; gap:0.75rem; margin-top:1rem; flex-wrap:wrap;">
+                <button class="btn btn-primary" id="btn-random-match" style="flex:1; min-width:130px;">
+                    <i class="fa fa-globe"></i> Random Match
+                </button>
+                <button class="btn btn-secondary" id="btn-host" style="flex:1; min-width:130px;">
+                    <i class="fa fa-server"></i> Create Private
+                </button>
+            </div>
 
             <div id="host-info" style="display:none;" class="info-box">
                 <div id="host-waiting-msg" style="color:#94a3b8;font-size:0.85rem;text-align:center;">Setting up room…</div>
@@ -865,6 +870,21 @@
             <button class="btn btn-primary" id="btn-rematch" style="flex:1;">Rematch</button>
             <button class="btn btn-secondary" id="btn-go-close" style="flex:1;">Close</button>
         </div>
+    </div>
+</div>
+
+<!-- MATCHMAKING OVERLAY -->
+<div class="overlay" id="matchmaking-overlay" style="display:none; justify-content:center; align-items:center; z-index:9999;">
+    <div class="card" style="max-width:340px; width:100%; text-align:center; padding:2rem 1.5rem; border:1px solid rgba(251,191,36,0.3); box-shadow:0 8px 32px rgba(251,191,36,0.15);">
+        <div style="font-size:3rem; margin-bottom:1rem; animation: achievement-bounce 0.8s ease infinite alternate;">🌍</div>
+        <h2 style="font-size:1.25rem; font-weight:900; margin-bottom:0.5rem; color:var(--text);">Finding Opponent</h2>
+        <p style="color:var(--text2); font-size:0.8rem; line-height:1.4; margin-bottom:1.5rem;">
+            Searching matchmaking queue for players with matching clock settings...
+        </p>
+        <div style="display:flex; justify-content:center; margin-bottom:1.5rem;">
+            <i class="fa fa-spinner fa-spin" style="font-size:2rem; color:var(--accent);"></i>
+        </div>
+        <button class="btn btn-secondary" id="btn-cancel-matchmaking" style="width:100%;">Cancel Search</button>
     </div>
 </div>
 

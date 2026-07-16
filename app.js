@@ -32,6 +32,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const params    = new URLSearchParams(window.location.search);
     const autoRoom  = params.get('room');
 
+    // Auto-reconnect support on refresh
+    const lastMatch = localStorage.getItem('last_online_match');
+    if (lastMatch && !autoRoom) {
+        try {
+            const data = JSON.parse(lastMatch);
+            // Check if match was stored less than 5 minutes ago
+            if (Date.now() - data.timestamp < 300000) {
+                toast('⚡ Reconnecting to active game...');
+                setTimeout(() => {
+                    APP.preset.min = data.mins;
+                    APP.preset.inc = data.inc;
+                    joinGame(data.opponentPeerId || data.roomCode);
+                }, 1500);
+            } else {
+                localStorage.removeItem('last_online_match');
+            }
+        } catch(_) {
+            localStorage.removeItem('last_online_match');
+        }
+    }
+
     // Time preset buttons
     document.querySelectorAll('.time-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -75,7 +96,9 @@ document.addEventListener('DOMContentLoaded', () => {
     incInp.addEventListener('input', validateCustomInputs);
     incInp.addEventListener('blur', validateCustomInputs);
 
-    // Host / Join / AI / Pass
+    // Host / Join / AI / Pass / Matchmaking
+    document.getElementById('btn-random-match').addEventListener('click', startRandomMatchmaking);
+    document.getElementById('btn-cancel-matchmaking').addEventListener('click', cancelMatchmaking);
     document.getElementById('btn-host').addEventListener('click', hostGame);
     document.getElementById('btn-join').addEventListener('click', () => {
         let val = document.getElementById('inp-room').value.trim();
@@ -391,6 +414,22 @@ function showLobby() {
     // Reset host UI
     document.getElementById('btn-host').style.display = '';
     document.getElementById('host-info').style.display = 'none';
+    localStorage.removeItem('last_online_match');
+    cleanupMatchmaking();
+    if (currentRoomCode) {
+        import('./db-service.js').then(({ DbService }) => {
+            DbService.deleteOnlineRoom(currentRoomCode).catch(() => {});
+            currentRoomCode = null;
+        });
+    }
+    if (window.APP) {
+        if (APP.roomCode) {
+            import('./db-service.js').then(({ DbService }) => {
+                DbService.deleteOnlineRoom(APP.roomCode).catch(() => {});
+                APP.roomCode = null;
+            });
+        }
+    }
     Network.init(); // re-open peer
 }
 
@@ -400,37 +439,86 @@ function showGameScreen() {
 }
 
 /* ============================================================= */
-/*  HOST GAME                                                     */
+/*  ONLINE MULTIPLAYER ARCHITECTURE                              */
 /* ============================================================= */
-function hostGame() {
-    APP.mode = 'online';
-    document.getElementById('btn-host').style.display = 'none';
-    document.getElementById('host-info').style.display = 'flex';
-    document.getElementById('host-waiting-msg').style.display = 'block';
-    document.getElementById('host-link-row').style.display = 'none';
+async function checkOnlineAllowed() {
+    const { AuthService } = await import('./auth-service.js');
+    if (AuthService.isGuest()) {
+        toast('⚠️ Online play is only available for registered users.');
+        return false;
+    }
+    const user = AuthService.getCurrentUser();
+    if (!user) {
+        toast('⚠️ Please sign in to play online.');
+        return false;
+    }
+    return true;
+}
 
-    Network.host(
-        // When peer ID is ready
-        (peerId) => {
-            document.getElementById('host-waiting-msg').style.display = 'none';
-            document.getElementById('host-link-row').style.display = 'block';
-            document.getElementById('room-code-display').textContent = peerId;
-            const link = `${location.origin}${location.pathname}?room=${peerId}`;
-            document.getElementById('invite-link-inp').value = link;
-        },
-        // When guest connects
-        () => {
-            document.getElementById('host-info').style.display = 'none';
-            document.getElementById('btn-host').style.display = '';
-            startMatch('w');
-        }
-    );
+let currentRoomCode = null;
+
+function hostGame() {
+    import('./auth-service.js').then(async ({ AuthService }) => {
+        if (!(await checkOnlineAllowed())) return;
+        const user = AuthService.getCurrentUser();
+
+        APP.mode = 'online';
+        document.getElementById('btn-host').style.display = 'none';
+        document.getElementById('host-info').style.display = 'flex';
+        document.getElementById('host-waiting-msg').style.display = 'block';
+        document.getElementById('host-link-row').style.display = 'none';
+
+        // Generate a 6-letter uppercase room code
+        currentRoomCode = Math.random().toString(36).substr(2, 6).toUpperCase();
+
+        Network.host(
+            async (peerId) => {
+                const { DbService } = await import('./db-service.js');
+                const profile = await DbService.getUserProfile(user.uid);
+                
+                await DbService.createOnlineRoom(
+                    currentRoomCode,
+                    peerId,
+                    user.uid,
+                    profile.username,
+                    profile.rating || 1200,
+                    APP.preset.min,
+                    APP.preset.inc
+                );
+
+                document.getElementById('host-waiting-msg').style.display = 'none';
+                document.getElementById('host-link-row').style.display = 'block';
+                document.getElementById('room-code-display').textContent = currentRoomCode;
+                const link = `${location.origin}${location.pathname}?room=${currentRoomCode}`;
+                document.getElementById('invite-link-inp').value = link;
+            },
+            async () => {
+                // Opponent connected
+                document.getElementById('host-info').style.display = 'none';
+                document.getElementById('btn-host').style.display = '';
+                
+                // Remove room mapping document from Firestore
+                const { DbService } = await import('./db-service.js');
+                if (currentRoomCode) {
+                    await DbService.deleteOnlineRoom(currentRoomCode);
+                    currentRoomCode = null;
+                }
+                startMatch('w');
+            }
+        );
+    });
 }
 
 function cancelHost() {
     Network.disconnect();
     document.getElementById('host-info').style.display = 'none';
     document.getElementById('btn-host').style.display = '';
+    if (currentRoomCode) {
+        import('./db-service.js').then(({ DbService }) => {
+            DbService.deleteOnlineRoom(currentRoomCode);
+            currentRoomCode = null;
+        });
+    }
 }
 
 function copyLink() {
@@ -442,16 +530,133 @@ function copyLink() {
     });
 }
 
-/* ============================================================= */
-/*  JOIN GAME                                                     */
-/* ============================================================= */
-function joinGame(roomId) {
-    APP.mode = 'online';
-    toast('Connecting…');
-    Network.join(roomId, () => {
-        // Guest always gets black
-        startMatch('b');
+async function joinGame(roomId) {
+    if (!(await checkOnlineAllowed())) return;
+
+    import('./auth-service.js').then(async ({ AuthService }) => {
+        const user = AuthService.getCurrentUser();
+        APP.mode = 'online';
+        toast('Connecting…');
+
+        const cleanedId = roomId.trim().toUpperCase();
+        const { DbService } = await import('./db-service.js');
+        const room = await DbService.getOnlineRoom(cleanedId);
+        
+        if (room) {
+            APP.preset.min = room.mins;
+            APP.preset.inc = room.inc;
+            
+            Network.join(room.hostPeerId, async () => {
+                const profile = await DbService.getUserProfile(user.uid);
+                await DbService.updateOnlineRoom(cleanedId, {
+                    status: "connected",
+                    guestUid: user.uid,
+                    guestUsername: profile.username,
+                    guestRating: profile.rating || 1200
+                });
+                startMatch('b');
+            });
+        } else if (roomId.length > 12) {
+            // direct PeerID UUID fallback
+            Network.join(roomId, () => {
+                startMatch('b');
+            });
+        } else {
+            toast('Room not found or expired.');
+        }
     });
+}
+
+/* ============================================================= */
+/*  RANDOM MATCHMAKING                                           */
+/* ============================================================= */
+let matchmakingUnsubscribe = null;
+let currentQueueDocRef = null;
+
+async function startRandomMatchmaking() {
+    if (!(await checkOnlineAllowed())) return;
+
+    const { AuthService } = await import('./auth-service.js');
+    const { DbService } = await import('./db-service.js');
+
+    const user = AuthService.getCurrentUser();
+    const profile = await DbService.getUserProfile(user.uid);
+
+    APP.mode = 'online';
+    document.getElementById('matchmaking-overlay').style.display = 'flex';
+
+    Network.host(
+        async (peerId) => {
+            const opponent = await DbService.findOpponentInQueue(user.uid, APP.preset.min, APP.preset.inc);
+            if (opponent) {
+                // Connect to opponent as Black
+                document.getElementById('matchmaking-overlay').style.display = 'none';
+                
+                const { doc, db, updateDoc } = await import('./firebase-init.js');
+                const queueDocRef = doc(db, "matchmaking_queue", opponent.userId);
+                await updateDoc(queueDocRef, {
+                    opponentUid: user.uid,
+                    opponentUsername: profile.username,
+                    opponentRating: profile.rating || 1200,
+                    opponentPeerId: peerId,
+                    status: "connected"
+                });
+
+                Network.join(opponent.peerId, () => {
+                    startMatch('b');
+                });
+            } else {
+                // Join queue and wait as White
+                const { doc, db, onSnapshot } = await import('./firebase-init.js');
+                currentQueueDocRef = await DbService.joinMatchmakingQueue(
+                    user.uid,
+                    peerId,
+                    profile.username,
+                    profile.rating || 1200,
+                    APP.preset.min,
+                    APP.preset.inc
+                );
+
+                matchmakingUnsubscribe = onSnapshot(currentQueueDocRef, async (snapshot) => {
+                    if (snapshot.exists()) {
+                        const data = snapshot.data();
+                        if (data && data.status === "connected" && data.opponentPeerId) {
+                            cleanupMatchmaking();
+                            document.getElementById('matchmaking-overlay').style.display = 'none';
+                            
+                            await DbService.leaveMatchmakingQueue(user.uid);
+                            startMatch('w');
+                        }
+                    }
+                });
+            }
+        },
+        () => {}
+    );
+}
+
+function cancelMatchmaking() {
+    cleanupMatchmaking();
+    document.getElementById('matchmaking-overlay').style.display = 'none';
+    Network.disconnect();
+}
+
+function cleanupMatchmaking() {
+    if (matchmakingUnsubscribe) {
+        matchmakingUnsubscribe();
+        matchmakingUnsubscribe = null;
+    }
+    if (currentQueueDocRef) {
+        import('./auth-service.js').then(({ AuthService }) => {
+            const user = AuthService.getCurrentUser();
+            if (user) {
+                import('./db-service.js').then(({ DbService }) => {
+                    DbService.leaveMatchmakingQueue(user.uid);
+                });
+            }
+        });
+        currentQueueDocRef = null;
+    }
 }
 
 /* ============================================================= */
@@ -478,21 +683,54 @@ function startMatch(myColor) {
     // Player info
     const isOnline = APP.mode === 'online';
     const isAI     = APP.mode === 'ai';
-    const localName = myColor === 'w' ? 'White' : 'Black';
     
-    let aiLabel = 'AI';
-    if (isAI && APP.aiLevel) {
-        aiLabel = APP.aiLevel.charAt(0).toUpperCase() + APP.aiLevel.slice(1);
+    let myNameLabel = myColor === 'w' ? 'White' : 'Black';
+    let myAvatarLabel = myColor === 'w' ? 'W' : 'B';
+    
+    let oppNameLabel = myColor === 'w' ? 'Black' : 'White';
+    let oppAvatarLabel = myColor === 'w' ? 'B' : 'W';
+    
+    if (isAI) {
+        let aiLabel = 'AI';
+        if (APP.aiLevel) {
+            aiLabel = APP.aiLevel.charAt(0).toUpperCase() + APP.aiLevel.slice(1);
+        }
+        oppNameLabel = `AI (${aiLabel})`;
+        oppAvatarLabel = '🤖';
+    } else if (isOnline) {
+        oppNameLabel = APP.opponentUsername ? `${APP.opponentUsername} (${APP.opponentRating || 1200})` : oppNameLabel;
+        oppAvatarLabel = APP.opponentAvatar || '👤';
     }
 
-    const oppName   = myColor === 'w'
-        ? (isAI ? `AI (${aiLabel})` : 'Black')
-        : (isAI ? `AI (${aiLabel})` : 'White');
+    document.getElementById('nm-me').textContent  = myNameLabel;
+    document.getElementById('nm-opp').textContent = oppNameLabel;
+    document.getElementById('av-me').textContent  = myAvatarLabel;
+    document.getElementById('av-opp').textContent = oppAvatarLabel;
 
-    document.getElementById('nm-me').textContent  = localName;
-    document.getElementById('nm-opp').textContent = oppName;
-    document.getElementById('av-me').textContent  = myColor === 'w' ? 'W' : 'B';
-    document.getElementById('av-opp').textContent = myColor === 'w' ? 'B' : 'W';
+    // Fetch live profile details asynchronously if authenticated
+    import('./auth-service.js').then(({ AuthService }) => {
+        const user = AuthService.getCurrentUser();
+        if (user && !AuthService.isGuest()) {
+            import('./db-service.js').then(async ({ DbService }) => {
+                const profile = await DbService.getUserProfile(user.uid);
+                if (profile) {
+                    document.getElementById('nm-me').textContent = `${profile.username} (${profile.rating || 1200})`;
+                    document.getElementById('av-me').textContent = profile.avatar || '👤';
+                }
+            });
+        }
+    });
+
+    if (isOnline) {
+        localStorage.setItem('last_online_match', JSON.stringify({
+            myColor,
+            mins: APP.preset.min,
+            inc: APP.preset.inc,
+            opponentPeerId: Network.getOpponentPeerId(),
+            roomCode: currentRoomCode || 'MATCHMAKING',
+            timestamp: Date.now()
+        }));
+    }
 
     document.getElementById('match-title').textContent =
         isAI ? `vs AI (${aiLabel})` : isOnline ? 'Online Multiplayer' : 'Local Hotseat';

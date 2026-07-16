@@ -365,6 +365,16 @@ const ChessGame = (() => {
         // Network: send move
         if (window.APP && APP.mode === 'online') {
             Network.send({ type:'move', from, to, promo: promo || null, clocks: APP.clocks });
+            if (APP.roomCode) {
+                import('./db-service.js').then(({ DbService }) => {
+                    DbService.updateOnlineRoom(APP.roomCode, {
+                        fen: chessEngine.fen(),
+                        history: chessEngine.history(),
+                        clocks: APP.clocks,
+                        lastUpdated: Date.now()
+                    }).catch(() => {});
+                });
+            }
         }
 
         checkEnd();
@@ -391,6 +401,18 @@ const ChessGame = (() => {
         render();
         updateCaptures();
         appendMoveToLog(result);
+
+        if (window.APP && APP.mode === 'online' && APP.roomCode) {
+            import('./db-service.js').then(({ DbService }) => {
+                DbService.updateOnlineRoom(APP.roomCode, {
+                    fen: chessEngine.fen(),
+                    history: chessEngine.history(),
+                    clocks: APP.clocks,
+                    lastUpdated: Date.now()
+                }).catch(() => {});
+            });
+        }
+
         checkEnd();
     }
 
@@ -939,6 +961,13 @@ const ChessGame = (() => {
 /* ---------- Shared UI helpers (game context) ---------- */
 function showGameOver(emoji, title, detail) {
     clearInterval(window.APP && APP.timerInterval);
+    localStorage.removeItem('last_online_match');
+    if (window.APP && APP.mode === 'online' && APP.roomCode) {
+        import('./db-service.js').then(({ DbService }) => {
+            DbService.deleteOnlineRoom(APP.roomCode).catch(() => {});
+            APP.roomCode = null;
+        });
+    }
     document.getElementById('go-emoji').textContent  = emoji;
     document.getElementById('go-title').textContent  = title;
     document.getElementById('go-detail').textContent = detail;
@@ -970,8 +999,9 @@ function showGameOver(emoji, title, detail) {
                 const duration = matchStartTime ? Math.round((Date.now() - matchStartTime) / 1000) : 0;
                 
                 import('./db-service.js').then(({ DbService }) => {
+                    const oppRating = (window.APP && APP.mode === 'online') ? window.APP.opponentRating : null;
                     // 1. Record profile summary updates (wins/losses/draws ELO)
-                    DbService.recordGameResult(user.uid, outcome, opponentName).then(() => {
+                    DbService.recordGameResult(user.uid, outcome, opponentName, oppRating).then(() => {
                         // 2. Record detailed match history record
                         DbService.recordMatch(user.uid, {
                             opponent: opponentName,

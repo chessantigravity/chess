@@ -236,7 +236,59 @@ export function orderBy(fieldPath, directionStr = "asc") {
 
 export async function getDocs(queryInstance) {
     if (!isMock) return FirebaseFirestore.getDocs(queryInstance);
+    
+    const profiles = JSON.parse(localStorage.getItem("mock_profiles") || "{}");
+    const docs = [];
+    
+    const colPath = queryInstance.collectionRef ? queryInstance.collectionRef.collectionPath : null;
+    
+    for (const [id, data] of Object.entries(profiles)) {
+        if (colPath && data && data._collection === colPath) {
+            docs.push({
+                id,
+                exists: () => true,
+                data: () => data
+            });
+        }
+    }
+    
     return {
-        forEach: (callback) => {}
+        forEach: (callback) => docs.forEach(callback),
+        docs
     };
+}
+
+export async function addDoc(collectionRef, data) {
+    if (!isMock) return FirebaseFirestore.addDoc(collectionRef, data);
+    
+    const docId = "mock_doc_" + Math.random().toString(36).substr(2, 9);
+    const docRef = { collectionPath: collectionRef.collectionPath, docId };
+    await setDoc(docRef, { ...data, _collection: collectionRef.collectionPath });
+    return docRef;
+}
+
+export async function deleteDoc(docRef) {
+    if (!isMock) return FirebaseFirestore.deleteDoc(docRef);
+    
+    const profiles = JSON.parse(localStorage.getItem("mock_profiles") || "{}");
+    delete profiles[docRef.docId];
+    localStorage.setItem("mock_profiles", JSON.stringify(profiles));
+}
+
+export function onSnapshot(docRefOrQuery, callback) {
+    if (!isMock) return FirebaseFirestore.onSnapshot(docRefOrQuery, callback);
+    
+    const intervalId = setInterval(async () => {
+        if (docRefOrQuery.docId) {
+            const profiles = JSON.parse(localStorage.getItem("mock_profiles") || "{}");
+            const data = profiles[docRefOrQuery.docId] || null;
+            callback({
+                exists: () => data !== null,
+                data: () => data,
+                id: docRefOrQuery.docId
+            });
+        }
+    }, 1000);
+    
+    return () => clearInterval(intervalId);
 }

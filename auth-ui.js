@@ -189,11 +189,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- SESSION STATE WATCHER ---
     AuthService.onAuthStateChanged(async (user, isGuest) => {
+        const hostCard = document.getElementById('host-card');
         if (user) {
             // User is authenticated
             showMainScreen();
             await DbService.recordLogin(user.uid);
             renderUserProfile(user.uid);
+            if (hostCard) hostCard.classList.remove('guest-locked');
             
             // Show match history
             document.getElementById("match-history-card").style.display = "block";
@@ -202,6 +204,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // Guest mode active
             showMainScreen();
             renderGuestProfile();
+            if (hostCard) hostCard.classList.add('guest-locked');
             document.getElementById("match-history-card").style.display = "none";
         } else {
             // Unauthenticated
@@ -213,14 +216,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Share access to callback trigger for guest/manual updates
     window.authUIUpdate = (user, isGuest) => {
+        const hostCard = document.getElementById('host-card');
         if (user) {
             showMainScreen();
             renderUserProfile(user.uid);
+            if (hostCard) hostCard.classList.remove('guest-locked');
             document.getElementById("match-history-card").style.display = "block";
             fetchAndRenderMatches(user.uid);
         } else if (isGuest) {
             showMainScreen();
             renderGuestProfile();
+            if (hostCard) hostCard.classList.add('guest-locked');
             document.getElementById("match-history-card").style.display = "none";
         } else {
             showAuthScreenView();
@@ -294,7 +300,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <div class="lobby-profile-strip" id="lobby-strip-clickable" title="View Profile" style="cursor:pointer;">
                     <div class="lobby-strip-avatar">${profile.avatar || '👤'}</div>
                     <div class="lobby-strip-info">
-                        <span class="lobby-strip-name">${profile.username}</span>
+                        <span class="lobby-strip-name">${profile.username} (${profile.rating || 1200})</span>
                         <span class="lobby-strip-sub">${profile.gamesPlayed || 0} games &bull; ${profile.winPercentage || 0}% win rate</span>
                     </div>
                     <div class="lobby-strip-actions">
@@ -354,6 +360,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 { val: profile.losses || 0,                 lbl: 'Losses',      color: '#ef4444' },
                 { val: profile.draws || 0,                  lbl: 'Draws',       color: '#94a3b8' },
                 { val: winRate + '%',                       lbl: 'Win Rate',    color: '#3b82f6' },
+                { val: profile.rating || 1200,              lbl: 'Rating',      color: '#8b5cf6' },
                 { val: profile.highestAIDefeated || 'None', lbl: 'Best AI',     color: '#f59e0b', small: true },
                 { val: profile.favoriteOpening || 'None',   lbl: 'Opening',     color: '',        small: true },
                 { val: '⭐ ' + totalStars,                  lbl: 'Puzzle ★',   color: '#fbbf24' },
@@ -469,6 +476,8 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderGuestProfile() {
         const bar = document.getElementById('lobby-profile-bar');
         if (!bar) return;
+        const hostCard = document.getElementById('host-card');
+        if (hostCard) hostCard.classList.add('guest-locked');
         bar.style.display = 'block';
         bar.innerHTML = `
             <div class="lobby-profile-strip">
