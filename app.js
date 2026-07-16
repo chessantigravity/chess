@@ -613,3 +613,13 @@ function toast(msg) {
     el._t = setTimeout(() => el.classList.remove('show'), 2500);
 }
 
+/* ============================================================= */
+/*  GLOBAL EXPORTS — needed by inline HTML handlers & plain       */
+/*  scripts (game.js, network.js) that run outside module scope   */
+/* ============================================================= */
+window.setTheme  = setTheme;
+window.copyLink  = copyLink;
+window.switchTab = switchTab;
+window.toast     = toast;
+window.startMatch= startMatch;
+
