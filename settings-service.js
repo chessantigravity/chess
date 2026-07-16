@@ -1,5 +1,5 @@
 /* =============================================================
-   ANTIGRAVITY CHESS — Settings Service (settings-service.js)
+   CHESS — Settings Service (settings-service.js)
    All settings persist to localStorage and apply as CSS vars
    ============================================================= */
 

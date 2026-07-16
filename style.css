@@ -1,5 +1,5 @@
 /* =============================================
-   ANTIGRAVITY CHESS — Complete Stylesheet
+   CHESS — Complete Stylesheet
    ============================================= */
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
@@ -1079,8 +1079,10 @@ body {
 #puzzle-academy {
     height: calc(100vh - 60px);
     overflow: hidden;
-    display: none;
     padding: 0 !important;
+}
+#puzzle-academy.active {
+    display: block !important;
 }
 .puzzle-container {
     display: grid;

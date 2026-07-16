@@ -1,5 +1,5 @@
 /* =============================================================
-   ANTIGRAVITY CHESS — Email Service (email-service.js)
+   CHESS — Email Service (email-service.js)
    Integrates with Resend to send onboarding and welcome emails
    ============================================================= */
 
@@ -13,7 +13,7 @@ export async function sendWelcomeEmail(email, username) {
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Welcome to Antigravity Chess</title>
+        <title>Welcome to Chess</title>
         <style>
             body {
                 font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -109,7 +109,7 @@ export async function sendWelcomeEmail(email, username) {
             <div class="container">
                 <div class="logo">♞</div>
                 <div class="title">Welcome, ${username}!</div>
-                <div class="subtitle">Thanks for joining Antigravity Chess. Your account is ready.</div>
+                <div class="subtitle">Thanks for joining Chess. Your account is ready.</div>
                 
                 <div class="divider"></div>
                 
@@ -145,7 +145,7 @@ export async function sendWelcomeEmail(email, username) {
                 <div class="divider"></div>
                 
                 <div class="footer">
-                    &copy; 2026 Antigravity Chess. All rights reserved.<br>
+                    &copy; 2026 Chess. All rights reserved.<br>
                     You are receiving this because you registered at ${appUrl}.
                 </div>
             </div>
@@ -162,9 +162,9 @@ export async function sendWelcomeEmail(email, username) {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                from: "Antigravity Chess <onboarding@resend.dev>",
+                from: "Chess <onboarding@resend.dev>",
                 to: email,
-                subject: `Welcome to Antigravity Chess, ${username}! ♞`,
+                subject: `Welcome to Chess, ${username}! ♞`,
                 html: htmlContent
             })
         });

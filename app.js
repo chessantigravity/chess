@@ -1,5 +1,5 @@
 /* =============================================================
-   ANTIGRAVITY CHESS — App Coordinator (app.js)
+   CHESS — App Coordinator (app.js)
    Handles UI, routing, timers, lobbying, chat
    ============================================================= */
 
@@ -377,10 +377,17 @@ function setTheme(t) {
 
 /* ============================================================= */
 /*  LOBBY / GAME ROUTING                                          */
-/* ============================================================= */
+function deactivateAllScreens() {
+    document.querySelectorAll('.screen').forEach(s => {
+        s.classList.remove('active');
+        s.style.display = ''; // Clear inline styles
+    });
+}
+window.deactivateAllScreens = deactivateAllScreens;
+
 function showLobby() {
+    deactivateAllScreens();
     document.getElementById('lobby').classList.add('active');
-    document.getElementById('game').classList.remove('active');
     // Reset host UI
     document.getElementById('btn-host').style.display = '';
     document.getElementById('host-info').style.display = 'none';
@@ -388,7 +395,7 @@ function showLobby() {
 }
 
 function showGameScreen() {
-    document.getElementById('lobby').classList.remove('active');
+    deactivateAllScreens();
     document.getElementById('game').classList.add('active');
 }
 

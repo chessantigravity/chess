@@ -1,5 +1,5 @@
 /* =============================================================
-   ANTIGRAVITY CHESS — Game Engine (game.js)
+   CHESS — Game Engine (game.js)
    Board: pure HTML div grid + Unicode pieces (100% reliable)
    Chess logic: chess.js 0.10.3
    ============================================================= */

@@ -1,7 +1,7 @@
 @echo off
-title Antigravity Chess
+title Chess
 echo ===================================================
-echo   Antigravity Chess Launcher
+echo   Chess Launcher
 echo   Starting local server and opening application window...
 echo ===================================================
 echo.

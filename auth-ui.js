@@ -1,5 +1,5 @@
 /* =============================================================
-   ANTIGRAVITY CHESS — Auth UI & Integration (auth-ui.js)
+   CHESS — Auth UI & Integration (auth-ui.js)
    Manages login/signup workflows and profile rendering in Lobby
    ============================================================= */
 
@@ -370,9 +370,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Progress bars (animate after small delay)
             setTimeout(() => {
-                const puzzlePct = Math.min(100, ((puzzleLevel - 1) / 506) * 100).toFixed(1);
+                const puzzlePct = Math.min(100, ((puzzleLevel - 1) / 504) * 100).toFixed(1);
                 const lessonsPct = Math.min(100, (lessons / 14) * 100).toFixed(1);
-                document.getElementById('ppage-puzzle-label').textContent  = `${puzzleLevel - 1} / 506`;
+                document.getElementById('ppage-puzzle-label').textContent  = `${puzzleLevel - 1} / 504`;
                 document.getElementById('ppage-lessons-label').textContent = `${lessons} / 14`;
                 document.getElementById('ppage-winrate-label').textContent = `${winRate}%`;
                 document.getElementById('ppage-puzzle-bar').style.width   = puzzlePct + '%';

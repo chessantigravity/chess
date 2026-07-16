@@ -1,5 +1,5 @@
 /* =============================================================
-   ANTIGRAVITY CHESS — Auth Service (auth-service.js)
+   CHESS — Auth Service (auth-service.js)
    Modular interface wrapping Firebase Authentication APIs
    ============================================================= */
 

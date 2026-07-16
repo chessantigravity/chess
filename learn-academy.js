@@ -1,5 +1,5 @@
 /* =============================================================
-   ANTIGRAVITY CHESS — Chess Academy Engine (learn-academy.js)
+   CHESS — Chess Academy Engine (learn-academy.js)
    Manages personalized learning paths, interactive tutorials,
    theory descriptions, auto-played demos, practice challenges, and quizzes.
    ============================================================= */
@@ -345,14 +345,13 @@ export function initLearnAcademy(user, isGuest) {
     currentUser = user;
 
     // Display appropriate screen
-    document.getElementById("lobby").style.display = "none";
-    document.getElementById("game").style.display = "none";
-    document.getElementById("learn-academy").style.display = "block";
+    if (window.deactivateAllScreens) window.deactivateAllScreens();
+    document.getElementById("learn-academy").classList.add("active");
 
     // Bind Home/Back Button
     document.getElementById("btn-learn-home").onclick = () => {
-        document.getElementById("learn-academy").style.display = "none";
-        document.getElementById("lobby").style.display = "block";
+        if (window.deactivateAllScreens) window.deactivateAllScreens();
+        document.getElementById("lobby").classList.add("active");
         // Refresh Lobby Profile dashboard
         if (window.authUIUpdate) window.authUIUpdate(currentUser, isGuest);
     };

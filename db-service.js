@@ -1,5 +1,5 @@
 /* =============================================================
-   ANTIGRAVITY CHESS — Database Service (db-service.js)
+   CHESS — Database Service (db-service.js)
    Modular interface wrapping Cloud Firestore APIs
    ============================================================= */
 

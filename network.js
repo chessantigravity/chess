@@ -1,5 +1,5 @@
 /* =============================================================
-   ANTIGRAVITY CHESS — Network Layer (network.js)
+   CHESS — Network Layer (network.js)
    PeerJS WebRTC P2P for online multiplayer
    ============================================================= */
 

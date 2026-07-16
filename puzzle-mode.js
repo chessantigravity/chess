@@ -1,5 +1,5 @@
 /* =============================================================
-   ANTIGRAVITY CHESS — Puzzle Mode Engine (puzzle-mode.js)
+   CHESS — Puzzle Mode Engine (puzzle-mode.js)
    Renders winding path maps, tracks completion stats, handles
    multi-move solution checks, hints, resets, and profiles syncing.
    ============================================================= */
@@ -8,7 +8,7 @@ import { generate500Puzzles } from "./puzzle-data.js";
 import { DbService } from "./db-service.js";
 import { AuthService } from "./auth-service.js";
 
-// Global puzzle database (506 entries)
+// Global puzzle database (504 entries)
 const PUZZLES_DB = generate500Puzzles();
 
 // Active Puzzle state
@@ -31,16 +31,13 @@ export function initPuzzleMode(user, isGuest) {
     isGuestUser = isGuest;
 
     // Show appropriate screen
-    document.getElementById("lobby").style.display = "none";
-    document.getElementById("game").style.display = "none";
-    document.getElementById("learn-academy").style.display = "none";
-    document.getElementById("puzzle-academy").style.display = "flex";
-    document.getElementById("puzzle-academy").style.flexDirection = "column";
+    if (window.deactivateAllScreens) window.deactivateAllScreens();
+    document.getElementById("puzzle-academy").classList.add("active");
 
     // Bind Home Button
     document.getElementById("btn-puzzle-home").onclick = () => {
-        document.getElementById("puzzle-academy").style.display = "none";
-        document.getElementById("lobby").style.display = "block";
+        if (window.deactivateAllScreens) window.deactivateAllScreens();
+        document.getElementById("lobby").classList.add("active");
         if (window.authUIUpdate) window.authUIUpdate(currentUser, isGuestUser);
     };
 
@@ -80,7 +77,7 @@ async function loadProgress() {
 async function saveProgress(levelCompleted, starsEarned) {
     puzzleStars[levelCompleted] = Math.max(puzzleStars[levelCompleted] || 0, starsEarned);
     
-    if (levelCompleted === unlockedLevel && unlockedLevel < 506) {
+    if (levelCompleted === unlockedLevel && unlockedLevel < PUZZLES_DB.length) {
         unlockedLevel++;
     }
 
@@ -388,7 +385,7 @@ function executeUserMove(fromSq, toSq) {
                 
                 // Show next puzzle level automatically after brief delay
                 setTimeout(() => {
-                    if (activeLevelId < 506) {
+                    if (activeLevelId < PUZZLES_DB.length) {
                         loadLevelPuzzle(activeLevelId + 1);
                         scrollCurrentLevelIntoView();
                     } else {

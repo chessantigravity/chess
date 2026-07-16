@@ -42,7 +42,7 @@ if __name__ == '__main__':
     time.sleep(0.5)
     
     url = f"http://127.0.0.1:{PORT}"
-    print(f"Launching Antigravity Chess client window at {url}...")
+    print(f"Launching Chess client window at {url}...")
     
     # Paths to Microsoft Edge executable
     edge_paths = [
