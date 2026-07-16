@@ -1472,3 +1472,83 @@ body {
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     pointer-events: none;
 }
+
+/* ---------- SOCIAL HUB STYLES ---------- */
+.friend-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    position: relative;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.friend-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg), 0 0 15px rgba(129, 182, 76, 0.1);
+    border-color: rgba(129, 182, 76, 0.2);
+}
+.friend-card-header {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+.friend-card-avatar {
+    font-size: 2.25rem;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 50%;
+    width: 52px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+.friend-status-dot {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--card);
+    background: #94a3b8; /* offline */
+}
+.friend-status-dot.online {
+    background: #22c55e; /* online */
+    box-shadow: 0 0 8px #22c55e;
+}
+.friend-card-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+.friend-card-name {
+    font-weight: 800;
+    font-size: 1.05rem;
+    color: var(--text);
+}
+.friend-card-meta {
+    font-size: 0.78rem;
+    color: var(--text2);
+    margin-top: 0.15rem;
+}
+.friend-card-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    background: rgba(0,0,0,0.15);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid rgba(255,255,255,0.02);
+}
+.friend-card-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+.friend-card-actions button {
+    flex: 1;
+}

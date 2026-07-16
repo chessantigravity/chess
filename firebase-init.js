@@ -30,7 +30,15 @@ if (isPlaceholder) {
     
     // Minimal mock DB structure in localStorage
     if (!localStorage.getItem("mock_users")) localStorage.setItem("mock_users", JSON.stringify({}));
-    if (!localStorage.getItem("mock_profiles")) localStorage.setItem("mock_profiles", JSON.stringify({}));
+    if (!localStorage.getItem("mock_profiles") || Object.keys(JSON.parse(localStorage.getItem("mock_profiles"))).length === 0) {
+        const mockProfiles = {
+            "mock_magnus": { uid: "mock_magnus", username: "magnus_c", displayName: "Magnus Carlsen", avatar: "👑", rating: 2850, _collection: "users", gamesPlayed: 3450, winPercentage: 74, joinDate: new Date().toISOString() },
+            "mock_hikaru": { uid: "mock_hikaru", username: "hikaru_n", displayName: "Hikaru Nakamura", avatar: "♞", rating: 2790, _collection: "users", gamesPlayed: 2900, winPercentage: 68, joinDate: new Date().toISOString() },
+            "mock_gukesh": { uid: "mock_gukesh", username: "gukesh_d", displayName: "Gukesh D", avatar: "⚔️", rating: 2760, _collection: "users", gamesPlayed: 1200, winPercentage: 62, joinDate: new Date().toISOString() },
+            "mock_ding": { uid: "mock_ding", username: "ding_l", displayName: "Ding Liren", avatar: "🏰", rating: 2750, _collection: "users", gamesPlayed: 1800, winPercentage: 59, joinDate: new Date().toISOString() }
+        };
+        localStorage.setItem("mock_profiles", JSON.stringify(mockProfiles));
+    }
 } else {
     try {
         app = initializeApp(firebaseConfig);
@@ -279,7 +287,7 @@ export function onSnapshot(docRefOrQuery, callback) {
     if (!isMock) return FirebaseFirestore.onSnapshot(docRefOrQuery, callback);
     
     const intervalId = setInterval(async () => {
-        if (docRefOrQuery.docId) {
+        if (docRefOrQuery && docRefOrQuery.docId) {
             const profiles = JSON.parse(localStorage.getItem("mock_profiles") || "{}");
             const data = profiles[docRefOrQuery.docId] || null;
             callback({
@@ -287,6 +295,26 @@ export function onSnapshot(docRefOrQuery, callback) {
                 data: () => data,
                 id: docRefOrQuery.docId
             });
+        } else if (docRefOrQuery) {
+            const colRef = docRefOrQuery.collectionRef || docRefOrQuery;
+            const colPath = colRef ? colRef.collectionPath : null;
+            if (colPath) {
+                const profiles = JSON.parse(localStorage.getItem("mock_profiles") || "{}");
+                const docs = [];
+                for (const [id, data] of Object.entries(profiles)) {
+                    if (data && data._collection === colPath) {
+                        docs.push({
+                            id,
+                            exists: () => true,
+                            data: () => data
+                        });
+                    }
+                }
+                callback({
+                    forEach: (cb) => docs.forEach(cb),
+                    docs
+                });
+            }
         }
     }, 1000);
     

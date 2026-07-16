@@ -28,6 +28,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Apply saved settings immediately (themes, colors, animation speed)
     SettingsService.init();
 
+    // Initialize Social/Friends Hub UI
+    import('./social-ui.js').then(({ SocialUI }) => {
+        SocialUI.init();
+    });
+
     // Auto-join from URL ?room=ID
     const params    = new URLSearchParams(window.location.search);
     const autoRoom  = params.get('room');

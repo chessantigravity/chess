@@ -190,12 +190,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- SESSION STATE WATCHER ---
     AuthService.onAuthStateChanged(async (user, isGuest) => {
         const hostCard = document.getElementById('host-card');
+        const socialCard = document.getElementById('social-hub-card');
         if (user) {
             // User is authenticated
             showMainScreen();
             await DbService.recordLogin(user.uid);
             renderUserProfile(user.uid);
             if (hostCard) hostCard.classList.remove('guest-locked');
+            if (socialCard) socialCard.classList.remove('guest-locked');
             
             // Show match history
             document.getElementById("match-history-card").style.display = "block";
@@ -205,6 +207,7 @@ document.addEventListener("DOMContentLoaded", () => {
             showMainScreen();
             renderGuestProfile();
             if (hostCard) hostCard.classList.add('guest-locked');
+            if (socialCard) socialCard.classList.add('guest-locked');
             document.getElementById("match-history-card").style.display = "none";
         } else {
             // Unauthenticated
@@ -217,16 +220,19 @@ document.addEventListener("DOMContentLoaded", () => {
     // Share access to callback trigger for guest/manual updates
     window.authUIUpdate = (user, isGuest) => {
         const hostCard = document.getElementById('host-card');
+        const socialCard = document.getElementById('social-hub-card');
         if (user) {
             showMainScreen();
             renderUserProfile(user.uid);
             if (hostCard) hostCard.classList.remove('guest-locked');
+            if (socialCard) socialCard.classList.remove('guest-locked');
             document.getElementById("match-history-card").style.display = "block";
             fetchAndRenderMatches(user.uid);
         } else if (isGuest) {
             showMainScreen();
             renderGuestProfile();
             if (hostCard) hostCard.classList.add('guest-locked');
+            if (socialCard) socialCard.classList.add('guest-locked');
             document.getElementById("match-history-card").style.display = "none";
         } else {
             showAuthScreenView();
@@ -478,6 +484,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!bar) return;
         const hostCard = document.getElementById('host-card');
         if (hostCard) hostCard.classList.add('guest-locked');
+        const socialCard = document.getElementById('social-hub-card');
+        if (socialCard) socialCard.classList.add('guest-locked');
         bar.style.display = 'block';
         bar.innerHTML = `
             <div class="lobby-profile-strip">

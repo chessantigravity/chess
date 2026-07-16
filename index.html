@@ -153,6 +153,16 @@
                 <i class="fa fa-puzzle-piece"></i> Play Puzzles
             </button>
         </div>
+
+        <!-- SOCIAL HUB CARD -->
+        <div class="card" id="social-hub-card">
+            <div class="card-icon">👥</div>
+            <h2>Social Hub</h2>
+            <p>Connect with friends, send challenges, track games together, and manage friend requests.</p>
+            <button class="btn btn-secondary" id="btn-enter-friends" style="margin-top:auto;">
+                <i class="fa fa-users"></i> Friends Hub <span class="badge" id="friends-badge" style="display:none; background:var(--danger); color:white; border-radius:50%; padding:0.15rem 0.4rem; font-size:0.75rem; margin-left:0.4rem; font-weight:800;">0</span>
+            </button>
+        </div>
     </div>
 
     <!-- MATCH HISTORY (bottom of lobby) -->
@@ -470,6 +480,158 @@
 
     </div>
 </section>
+
+<!-- ============ FRIENDS SCREEN ============ -->
+<section id="friends-screen" class="screen" style="overflow-y:auto; padding-bottom: 2rem;">
+    <div style="max-width:880px; margin:0 auto; padding:0 1rem; width:100%;">
+        
+        <!-- Friends Header -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+            <div>
+                <h1 style="font-size:1.75rem; font-weight:900; display:flex; align-items:center; gap:0.65rem;">
+                    <i class="fa fa-users" style="color:var(--accent);"></i> Social Hub
+                </h1>
+                <p style="color:var(--text2); font-size:0.85rem; margin-top:0.2rem;">Connect and play with other players</p>
+            </div>
+            <button class="btn btn-secondary" id="btn-friends-back" style="display:flex; align-items:center; gap:0.5rem;">
+                <i class="fa fa-arrow-left"></i> Back to Lobby
+            </button>
+        </div>
+
+        <!-- Social Navigation Tabs -->
+        <div class="time-presets" style="margin-bottom:1.5rem;">
+            <button class="time-btn active" id="tab-friends-list">My Friends</button>
+            <button class="time-btn" id="tab-friend-requests">Requests <span class="badge" id="requests-tab-badge" style="display:none; background:var(--danger); font-size:0.75rem; border-radius:50%; padding:0.1rem 0.35rem; color:white;">0</span></button>
+            <button class="time-btn" id="tab-search-players">Search Players</button>
+            <button class="time-btn" id="tab-recent-players">Recently Played</button>
+        </div>
+
+        <!-- Tab 1: Friends List -->
+        <div id="sect-friends-list" class="social-tab-content">
+            <div id="friends-list-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;">
+                <!-- Filled dynamically -->
+            </div>
+            <div id="friends-list-empty" style="display:none; text-align:center; padding:3rem 1rem;">
+                <div style="font-size:3rem; margin-bottom:1rem;">👥</div>
+                <h3 style="font-weight:700; margin-bottom:0.5rem;">No friends yet</h3>
+                <p style="color:var(--text2); font-size:0.85rem;">Search for other players or invite your friends to start playing together!</p>
+            </div>
+        </div>
+
+        <!-- Tab 2: Requests -->
+        <div id="sect-friend-requests" class="social-tab-content" style="display:none;">
+            <div style="display:flex; flex-direction:column; gap:1.5rem;">
+                <div class="card" style="padding:1.25rem;">
+                    <h3 style="margin-bottom:1rem; font-weight:800; display:flex; align-items:center; gap:0.5rem;">
+                        <i class="fa fa-arrow-circle-down" style="color:var(--accent);"></i> Received Requests
+                    </h3>
+                    <div id="received-requests-list" style="display:flex; flex-direction:column; gap:0.75rem;">
+                        <!-- Filled dynamically -->
+                    </div>
+                </div>
+
+                <div class="card" style="padding:1.25rem;">
+                    <h3 style="margin-bottom:1rem; font-weight:800; display:flex; align-items:center; gap:0.5rem;">
+                        <i class="fa fa-arrow-circle-up" style="color:var(--text2);"></i> Sent Requests
+                    </h3>
+                    <div id="sent-requests-list" style="display:flex; flex-direction:column; gap:0.75rem;">
+                        <!-- Filled dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Search Players -->
+        <div id="sect-search-players" class="social-tab-content" style="display:none;">
+            <div class="card" style="padding:1.25rem; margin-bottom:1.5rem;">
+                <div style="display:flex; gap:0.75rem;">
+                    <input class="inp" id="inp-search-players" placeholder="Search by username, email or display name..." style="flex:1;">
+                    <button class="btn btn-primary" id="btn-search-players"><i class="fa fa-search"></i> Search</button>
+                </div>
+            </div>
+            <div id="search-players-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;">
+                <!-- Filled dynamically -->
+            </div>
+            <div id="search-players-empty" style="text-align:center; padding:3rem 1rem; color:var(--text2);">
+                <div style="font-size:3rem; margin-bottom:1rem;">🔍</div>
+                <p>Type a player's username or email to search</p>
+            </div>
+        </div>
+
+        <!-- Tab 4: Recent Players -->
+        <div id="sect-recent-players" class="social-tab-content" style="display:none;">
+            <div id="recent-players-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;">
+                <!-- Filled dynamically -->
+            </div>
+            <div id="recent-players-empty" style="display:none; text-align:center; padding:3rem 1rem; color:var(--text2);">
+                <div style="font-size:3rem; margin-bottom:1rem;">⚔️</div>
+                <p>You haven't played matches against other human players recently</p>
+            </div>
+        </div>
+
+    </div>
+</section>
+
+<!-- FRIEND PROFILE & MATCH HISTORY MODAL -->
+<div class="overlay" id="friend-profile-overlay" style="display:none; z-index:1200;">
+    <div class="card" style="max-width:550px; width:100%; padding:1.5rem; position:relative; max-height:90vh; overflow-y:auto; display:flex; flex-direction:column; gap:1.25rem;">
+        <button class="btn btn-secondary btn-sm" id="btn-close-friend-modal" style="position:absolute; top:1rem; right:1rem; padding:0.4rem 0.65rem;">
+            <i class="fa fa-times"></i>
+        </button>
+        <div style="display:flex; gap:1rem; align-items:center; border-bottom:1px solid var(--card-border); padding-bottom:1rem;">
+            <div id="friend-modal-avatar" style="font-size:3.5rem; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:50%; width:80px; height:80px; display:flex; align-items:center; justify-content:center;">👤</div>
+            <div>
+                <h2 id="friend-modal-username" style="margin:0; font-weight:900;">Username</h2>
+                <div style="display:flex; gap:0.5rem; align-items:center; margin-top:0.35rem;">
+                    <span id="friend-modal-rating" class="badge" style="background:var(--accent); color:white; font-size:0.75rem; font-weight:800; padding:0.15rem 0.5rem;">ELO 1200</span>
+                    <span id="friend-modal-status" style="font-size:0.8rem; color:var(--text2);">Offline</span>
+                </div>
+            </div>
+        </div>
+        <div>
+            <h3 style="margin-bottom:0.75rem; font-weight:800; font-size:1rem; color:var(--text2); text-transform:uppercase; letter-spacing:0.05em;">Games Played Together</h3>
+            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:0.5rem; text-align:center;">
+                <div class="profile-stat-box" style="padding:0.5rem;">
+                    <span class="profile-stat-val" id="friend-stat-played">0</span>
+                    <span class="profile-stat-lbl">Played</span>
+                </div>
+                <div class="profile-stat-box" style="padding:0.5rem; border-color:rgba(34,197,94,0.2);">
+                    <span class="profile-stat-val" id="friend-stat-wins" style="color:#22c55e;">0</span>
+                    <span class="profile-stat-lbl">Wins</span>
+                </div>
+                <div class="profile-stat-box" style="padding:0.5rem; border-color:rgba(239,68,68,0.2);">
+                    <span class="profile-stat-val" id="friend-stat-losses" style="color:#ef4444;">0</span>
+                    <span class="profile-stat-lbl">Losses</span>
+                </div>
+                <div class="profile-stat-box" style="padding:0.5rem;">
+                    <span class="profile-stat-val" id="friend-stat-draws">0</span>
+                    <span class="profile-stat-lbl">Draws</span>
+                </div>
+            </div>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; gap:0.5rem;">
+            <h3 style="margin-bottom:0.25rem; font-weight:800; font-size:1rem; color:var(--text2); text-transform:uppercase; letter-spacing:0.05em;">Match History</h3>
+            <div id="friend-matches-list" style="display:flex; flex-direction:column; gap:0.5rem; max-height:220px; overflow-y:auto; padding-right:4px;">
+                <!-- Dynamic matches -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FRIEND REMOVE CONFIRMATION DIALOG -->
+<div class="overlay" id="friend-confirm-overlay" style="display:none; z-index:1300;">
+    <div class="card" style="max-width:320px; width:100%; text-align:center; padding:1.5rem;">
+        <div style="font-size:2.5rem; margin-bottom:0.75rem;">⚠️</div>
+        <h2 style="font-size:1.15rem; font-weight:900; margin-bottom:0.5rem;">Remove Friend</h2>
+        <p style="color:var(--text2); font-size:0.8rem; line-height:1.4; margin-bottom:1.25rem;">
+            Are you sure you want to remove <span id="confirm-friend-name" style="font-weight:700; color:var(--text);">friend</span> from your friends list?
+        </p>
+        <div style="display:flex; gap:0.75rem;">
+            <button class="btn btn-danger" id="btn-confirm-remove" style="flex:1;">Remove</button>
+            <button class="btn btn-secondary" id="btn-cancel-remove" style="flex:1;">Cancel</button>
+        </div>
+    </div>
+</div>
 
 <!-- ============ SETTINGS SCREEN ============ -->
 <section id="settings-screen" class="screen">
